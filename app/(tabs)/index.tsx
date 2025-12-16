@@ -1,98 +1,139 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View, Text, FlatList, Image, TouchableOpacity, ActivityIndicator, SafeAreaView } from 'react-native';
+import { supabase } from '@/lib/supabase';
+import { useCartStore } from '@/lib/store';
+import { BRAND_ID } from '@/lib/constants';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+// Types
+type Product = {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  image_url: string;
+};
+
+type Category = {
+  id: string;
+  name: string;
+  products: Product[];
+};
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { addItem, items } = useCartStore();
+  const router = useRouter();
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const cartCount = items.reduce((acc, item) => acc + item.quantity, 0);
+
+  useEffect(() => {
+    fetchMenu();
+  }, []);
+
+  const fetchMenu = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select(`
+          id, name,
+          products ( id, name, price, description, image_url, is_available )
+        `)
+        .eq('brand_id', BRAND_ID)
+        .eq('products.is_available', true)
+        .order('rank');
+
+      if (error) throw error;
+      
+      // Filtrer les catégories vides
+      const cleanData = data?.filter((c: any) => c.products.length > 0) || [];
+      setCategories(cleanData);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderProduct = ({ item }: { item: Product }) => (
+    <View style={styles.card}>
+      <Image source={{ uri: item.image_url || 'https://via.placeholder.com/150' }} style={styles.image} />
+      <View style={styles.info}>
+        <Text style={styles.name}>{item.name}</Text>
+        <Text style={styles.desc} numberOfLines={2}>{item.description}</Text>
+        <View style={styles.row}>
+          <Text style={styles.price}>{item.price} DH</Text>
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={() => addItem({ id: item.id, name: item.name, price: item.price })}
+          >
+            <Ionicons name="add" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="black" /></View>;
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Universal Eats 🍔</Text>
+        {cartCount > 0 && (
+          <TouchableOpacity onPress={() => router.push('/cart')} style={styles.cartBtn}>
+            <Ionicons name="cart" size={24} color="white" />
+            <View style={styles.badge}><Text style={styles.badgeText}>{cartCount}</Text></View>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <FlatList
+        data={categories}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{item.name}</Text>
+            {item.products.map((product) => (
+                <View key={product.id}>{renderProduct({ item: product })}</View>
+            ))}
+          </View>
+        )}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      />
+      
+      {/* FLOATING CART BUTTON */}
+      {cartCount > 0 && (
+          <TouchableOpacity style={styles.floatBtn} onPress={() => router.push('/cart')}>
+              <Text style={styles.floatText}>Voir le Panier ({cartCount})</Text>
+              <Ionicons name="arrow-forward" size={20} color="white" />
+          </TouchableOpacity>
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: 'white' },
+  title: { fontSize: 22, fontWeight: 'bold' },
+  cartBtn: { backgroundColor: 'black', padding: 10, borderRadius: 20 },
+  badge: { position: 'absolute', top: -5, right: -5, backgroundColor: 'red', borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
+  badgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+  section: { padding: 15 },
+  sectionTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
+  card: { flexDirection: 'row', backgroundColor: 'white', borderRadius: 15, padding: 10, marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
+  image: { width: 80, height: 80, borderRadius: 10, backgroundColor: '#eee' },
+  info: { flex: 1, marginLeft: 15, justifyContent: 'space-between' },
+  name: { fontWeight: 'bold', fontSize: 16 },
+  desc: { color: 'gray', fontSize: 12 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 },
+  price: { fontWeight: 'bold', fontSize: 16 },
+  addButton: { backgroundColor: 'black', width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
+  floatBtn: { position: 'absolute', bottom: 30, left: 20, right: 20, backgroundColor: 'black', padding: 15, borderRadius: 15, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 10, elevation: 10 },
+  floatText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
 });
