@@ -1,8 +1,19 @@
 import 'react-native-url-polyfill/auto'
 import { createClient } from '@supabase/supabase-js'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
-// ⚠️ REMPLACE AVEC TES CLÉS SUPABASE (Les mêmes que l'admin)
-const supabaseUrl = 'https://kdoodpxjgczqajykcqcd.supabase.co' 
-const supabaseAnonKey = 'sb_publishable_ddklRnFtTbJ6C9hVK3sU2w_Ocj8QHSs'
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error("⚠️ ERREUR CRITIQUE : Variables d'environnement Supabase manquantes.")
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: AsyncStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+})

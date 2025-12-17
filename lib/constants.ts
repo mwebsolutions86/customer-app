@@ -1,3 +1,12 @@
-// Copie les mêmes IDs que pour le site web
-export const BRAND_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'; 
-export const STORE_ID = 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b22';
+// On retire l'import inutile
+// import Constants from 'expo-constants'; 
+
+// --- ZONE DE DÉBOGAGE (ID FORCÉ) ---
+// Remplace bien 'TON_ID_ICI' par ton ID Supabase si ce n'est pas déjà fait
+export const CURRENT_STORE_ID = '73b158dd-4ff1-4294-9279-0f5d98f95480'; 
+
+// Couleur par défaut
+export const THEME_COLOR = '#eab308'; 
+// ------------------------
+
+console.log("🔒 ID FORCÉ :", CURRENT_STORE_ID);
