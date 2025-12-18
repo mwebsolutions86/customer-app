@@ -1,44 +1,68 @@
-// context/ThemeContext.js
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import { ActivityIndicator, View } from 'react-native';
 
-// 1. Définition des couleurs
-const lightColors = {
-  background: '#f8f9fa',
-  text: '#000000',
-  card: '#ffffff',
-  border: '#f0f0f0',
-  subText: '#666666',
-  tint: '#007AFF'
+// Couleurs par défaut (fallback si pas d'internet ou chargement)
+const defaultTheme = {
+  primaryColor: '#FFC107', // Jaune par défaut
+  secondaryColor: '#000000',
+  logoUrl: null,
+  name: 'Loading...',
+  loading: true,
 };
 
-const darkColors = {
-  background: '#1c1c1e',
-  text: '#ffffff',
-  card: '#2c2c2e',
-  border: '#3a3a3c',
-  subText: '#aaaaaa',
-  tint: '#0A84FF'
-};
+const ThemeContext = createContext(defaultTheme);
 
-// 2. Création du contexte
-const ThemeContext = createContext();
-
-// 3. Le "Fournisseur" (Provider) qui va envelopper l'app
 export const ThemeProvider = ({ children }) => {
-  const [isDark, setIsDark] = useState(false); // Par défaut en clair
+  const [theme, setTheme] = useState(defaultTheme);
 
-  const toggleTheme = () => {
-    setIsDark((prev) => !prev);
-  };
+  useEffect(() => {
+    const fetchTheme = async () => {
+      try {
+        // On récupère la config du PREMIER magasin trouvé
+        const { data, error } = await supabase
+          .from('stores')
+          .select('primary_color, secondary_color, logo_url, name')
+          .limit(1)
+          .single();
 
-  const theme = isDark ? darkColors : lightColors;
+        if (data && !error) {
+          setTheme({
+            primaryColor: data.primary_color || '#FFC107',
+            secondaryColor: data.secondary_color || '#000000',
+            logoUrl: data.logo_url,
+            name: data.name,
+            loading: false,
+          });
+        } else {
+          // Si erreur, on garde les defaults mais on arrête le chargement
+          setTheme(prev => ({ ...prev, loading: false }));
+        }
+      } catch (e) {
+        console.error('Erreur chargement thème:', e);
+        setTheme(prev => ({ ...prev, loading: false }));
+      }
+    };
+
+    fetchTheme();
+  }, []);
+
+  // Optionnel : Écran de chargement (Splash screen étendu)
+  // Si vous voulez que l'app attende d'avoir les couleurs avant d'afficher quoi que ce soit
+  if (theme.loading) {
+     return (
+       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+         <ActivityIndicator size="large" color="#FFC107" />
+       </View>
+     );
+  }
 
   return (
-    <ThemeContext.Provider value={{ isDark, toggleTheme, theme }}>
+    <ThemeContext.Provider value={theme}>
       {children}
     </ThemeContext.Provider>
   );
 };
 
-// 4. Un petit raccourci (Hook) pour utiliser le thème partout
-export const useTheme = () => useContext(ThemeContext);
+// Hook personnalisé pour utiliser les couleurs facilement partout
+export const useAppTheme = () => useContext(ThemeContext);
