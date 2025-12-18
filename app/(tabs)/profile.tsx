@@ -1,6 +1,6 @@
 // app/(tabs)/profile.tsx
 import React from 'react'; // Plus besoin de useState ici !
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext'; // <--- L'IMPORT MAGIQUE
 

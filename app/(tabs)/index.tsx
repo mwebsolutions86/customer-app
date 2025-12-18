@@ -5,14 +5,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMenu } from '../../hooks/use-menu';
 import { useCart } from '../../hooks/use-cart';
 import { useRouter } from 'expo-router';
-import { useTheme } from '../../context/ThemeContext'; // 1. Importer
+
 
 // ⚠️ TON ID STORE
 const STORE_ID = '73b158dd-4ff1-4294-9279-0f5d98f95480'; 
 const { width } = Dimensions.get('window');
 
 export default function MenuScreen() {
-    const { theme } = useTheme();
+   
   const { categories, store, loading } = useMenu(STORE_ID);
   const { addToCart, items } = useCart();
   const router = useRouter();
