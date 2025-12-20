@@ -1,56 +1,73 @@
 import { create } from 'zustand';
 
-// 1. Définition du type d'un article
+// 1. Définition complète d'un article panier (Support Options + Ingrédients)
 export interface CartItem {
-  cartId: string;
+  cartId: string; // ID unique (Produit + Options + Ingrédients)
   id: string;
   name: string;
-  price: number;
+  price: number;       // Prix de base
+  finalPrice: number;  // Prix avec options incluses
   quantity: number;
   image_url: string | null;
-  options: any[];
+  selectedOptions: any[];      // Renommé pour correspondre à la modale
+  removedIngredients: string[]; // NOUVEAU : Gestion des "Sans oignons"
 }
 
-// 2. L'Interface qui définit ce que contient le panier (Données + Actions)
 interface CartState {
   items: CartItem[];
   
-  // C'est cette ligne qui manquait et qui causait l'erreur TypeScript :
-  addToCart: (product: any, quantity: number, options: any[]) => void;
+  // On renomme 'addToCart' en 'addItem' pour matcher la modale
+  // On accepte un objet complet "payload" au lieu de paramètres séparés
+  addItem: (item: any) => void;
   
-  removeFromCart: (cartId: string) => void;
+  removeItem: (cartId: string) => void;
   clearCart: () => void;
   getTotalPrice: () => number;
 }
 
-// 3. L'Implémentation
 export const useCart = create<CartState>((set, get) => ({
   items: [],
 
-  addToCart: (product, quantity = 1, options = []) => {
+  addItem: (payload) => {
     set((state) => {
-      const cartId = `${product.id}-${JSON.stringify(options.sort())}`;
+      // GÉNÉRATION D'UN ID UNIQUE "FOOD TECH"
+      // Un "Burger Sans Oignon" est différent d'un "Burger Normal"
+      // On crée l'ID en combinant : ID Produit + Options triées + Ingrédients retirés triés
+      
+      const optionsStr = JSON.stringify(
+          (payload.selectedOptions || []).sort((a: any, b: any) => (a.id || '').localeCompare(b.id || ''))
+      );
+      const ingredientsStr = JSON.stringify(
+          (payload.removedIngredients || []).sort()
+      );
+      
+      const cartId = `${payload.id}-${optionsStr}-${ingredientsStr}`;
+
       const existingItemIndex = state.items.findIndex((item) => item.cartId === cartId);
       let updatedItems = [...state.items];
 
       if (existingItemIndex > -1) {
-        updatedItems[existingItemIndex].quantity += quantity;
+        // Si exactement le même produit existe (mêmes options/ingrédients), on augmente la quantité
+        updatedItems[existingItemIndex].quantity += payload.quantity;
       } else {
+        // Sinon, on ajoute une nouvelle ligne
         updatedItems.push({
           cartId,
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          image_url: product.image_url,
-          quantity,
-          options
+          id: payload.id,
+          name: payload.name,
+          price: payload.price,
+          finalPrice: payload.finalPrice, // Le prix calculé par la modale
+          image_url: payload.image_url,
+          quantity: payload.quantity,
+          selectedOptions: payload.selectedOptions || [],
+          removedIngredients: payload.removedIngredients || []
         });
       }
       return { items: updatedItems };
     });
   },
 
-  removeFromCart: (cartId) => {
+  removeItem: (cartId) => {
     set((state) => ({
       items: state.items.filter((item) => item.cartId !== cartId),
     }));
@@ -60,6 +77,7 @@ export const useCart = create<CartState>((set, get) => ({
 
   getTotalPrice: () => {
     const { items } = get();
-    return items.reduce((total, item) => total + (item.price * item.quantity), 0);
+    // On utilise finalPrice qui inclut déjà les suppléments
+    return items.reduce((total, item) => total + (item.finalPrice * item.quantity), 0);
   }
 }));

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, FlatList, TouchableOpacity, TextInput, Alert, SafeAreaView } from 'react-native';
 import { useCartStore } from '@/lib/store';
 import { supabase } from '@/lib/supabase';
-import { STORE_ID } from '@/lib/constants';
+import { CURRENT_STORE_ID } from '@/lib/constants';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
@@ -29,7 +29,7 @@ export default function CartScreen() {
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
-          store_id: STORE_ID,
+          store_id: CURRENT_STORE_ID,
           status: 'NEW',
           total_amount: finalTotal,
           delivery_fee: DELIVERY_FEE,

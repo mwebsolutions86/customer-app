@@ -1,25 +1,57 @@
 import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { View, ActivityIndicator } from 'react-native';
 import { Session } from '@supabase/supabase-js';
-import AuthScreen from './auth'; // On importe notre nouvel écran
-import { ThemeProvider } from '../context/ThemeContext'; // Importe ton nouveau fichier
+import AuthScreen from './auth';
+import SelectStoreScreen from './select-store'; // On importe notre nouvel écran
+import { ThemeProvider } from '@/context/ThemeContext';
+import { StoreProvider, useStore } from '../context/StoreProvider'; // On importe useStore aussi
 
+// 1. On crée un composant interne qui a accès au Contexte
+function AppContent({ session }: { session: Session | null }) {
+  const { currentStore, isLoading } = useStore();
 
+  // Si le chargement du store n'est pas fini
+  if (isLoading) {
+     return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#000" />
+      </View>
+    );
+  }
 
+  // LOGIQUE PRINCIPALE DE NAVIGATION
 
+  // Cas A : Pas connecté -> Auth
+  if (!session) {
+    return <AuthScreen />;
+  }
+
+  // Cas B : Connecté MAIS pas de magasin choisi -> Choix du magasin
+  if (!currentStore) {
+    return <SelectStoreScreen />;
+  }
+
+  // Cas C : Connecté ET magasin choisi -> Application (Tabs)
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+    </Stack>
+  );
+}
+
+// 2. Le Layout Principal qui enveloppe tout avec les Providers
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    // 1. Vérifier la session actuelle
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
-    // 2. Écouter les changements (Connexion / Déconnexion)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
@@ -27,7 +59,6 @@ export default function RootLayout() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Écran de chargement initial
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -36,18 +67,12 @@ export default function RootLayout() {
     );
   }
 
-  // SI PAS CONNECTÉ -> AFFICHER AUTH SCREEN
-  if (!session) {
-    return <AuthScreen />;
-  }
-
-  // SI CONNECTÉ -> AFFICHER L'APPLICATION NORMALE (Les Tabs)
   return (
-    // On enveloppe tout le Stack dans le ThemeProvider
     <ThemeProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-      </Stack>
+      <StoreProvider>
+        {/* On passe la session à notre composant de contenu */}
+        <AppContent session={session} />
+      </StoreProvider>
     </ThemeProvider>
   );
 }

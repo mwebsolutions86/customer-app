@@ -1,7 +1,29 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
-// --- TYPES MIS À JOUR ---
+// --- TYPES MIS À JOUR (Synchronisés avec Admin) ---
+export interface OptionItem {
+  id: string;
+  name: string;
+  price: number;
+  is_available: boolean;
+}
+
+export interface OptionGroup {
+  id: string;
+  name: string;
+  type: 'single' | 'multiple';
+  min: number; // NOUVEAU
+  max: number; // NOUVEAU
+  items: OptionItem[];
+}
+
+export interface Ingredient {
+  id: string;
+  name: string;
+  is_available: boolean;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -9,8 +31,8 @@ export interface Product {
   price: number;
   image_url: string | null;
   category_id: string;
-  ingredients: string[];
-  options_config: any[];
+  ingredients: Ingredient[]; 
+  option_groups: OptionGroup[];
 }
 
 export interface Category {
@@ -37,36 +59,52 @@ export const useMenu = (storeId: string) => {
 
   const fetchMenuData = useCallback(async () => {
     try {
-      // 1. Récupérer TOUTES les infos du Store (Couleurs, Logo, etc.)
-      const { data: storeData } = await supabase
-          .from('stores')
-          .select('*') // On prend tout
-          .eq('id', storeId)
-          .single();
+      const { data: storeData } = await supabase.from('stores').select('*').eq('id', storeId).single();
 
       if (storeData) {
-          // On force le typage pour correspondre à notre interface
           setStore(storeData as Store);
 
-          // 2. Récupérer Catégories & Produits
-          const { data: cats } = await supabase
+          const { data: cats, error } = await supabase
           .from('categories')
           .select(`
               id, name, rank, image_url,
               products (
-                id, name, description, price, image_url, ingredients, options_config, created_at
+                id, name, description, price, image_url, created_at, is_available,
+                product_option_links (
+                  group: option_groups (
+                    id, name, type, min_selection, max_selection,
+                    items: option_items (id, name, price, is_available)
+                  )
+                ),
+                product_ingredients (
+                  ingredient: ingredients (id, name, is_available)
+                )
               )
           `)
-          .eq('brand_id', storeData.brand_id) // Assure-toi que brand_id existe dans ta table stores
+          .eq('brand_id', storeData.brand_id)
           .order('rank');
+
+          if (error) throw error;
 
           if (cats) {
               const formattedCats = cats.map((cat: any) => ({
                   ...cat,
-                  products: cat.products.sort((a: any, b: any) => 
-                    a.name.localeCompare(b.name)
-                  )
+                  products: cat.products
+                    .filter((p: any) => p.is_available !== false)
+                    .map((prod: any) => ({
+                        ...prod,
+                        option_groups: prod.product_option_links?.map((link: any) => ({
+                            ...link.group,
+                            // MAPPING CRITIQUE : On transforme les noms DB vers Front
+                            min: link.group?.min_selection || 0,
+                            max: link.group?.max_selection || 1,
+                            items: link.group?.items?.sort((a:any, b:any) => a.price - b.price) || []
+                        })) || [],
+                        ingredients: prod.product_ingredients?.map((link: any) => link.ingredient) || []
+                    }))
+                    .sort((a: any, b: any) => a.name.localeCompare(b.name))
               }));
+              
               setCategories(formattedCats);
           }
       }
@@ -79,29 +117,12 @@ export const useMenu = (storeId: string) => {
 
   useEffect(() => {
     if (!storeId) return;
-
     fetchMenuData();
-
-    // --- LE SECRET DU TEMPS RÉEL ---
-    const channel = supabase
-      .channel('public-updates')
-      // A. Écoute les changements sur les PRODUITS
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => fetchMenuData())
-      // B. Écoute les changements sur les CATÉGORIES
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => fetchMenuData())
-      // C. Écoute les changements sur le STORE (Paramètres, Couleurs, Ouverture)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stores', filter: `id=eq.${storeId}` }, 
-        (payload) => {
-          console.log("🎨 Paramètres mis à jour !", payload.new);
-          // Mise à jour immédiate du store local sans tout recharger
-          setStore(prev => ({ ...prev, ...payload.new } as Store));
-        }
-      )
+    const channel = supabase.channel('menu-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, fetchMenuData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'option_groups' }, fetchMenuData) // Écouter les changements de règles
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [storeId, fetchMenuData]);
 
   return { categories, store, loading };

@@ -1,176 +1,197 @@
-import { useState, useEffect } from 'react';
-import { Modal, View, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native'; // Platform retiré
-import { ThemedText } from './themed-text';
-import { X, Check, Plus, Minus } from 'lucide-react-native';
-import { THEME_COLOR } from '@/lib/constants';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Modal, TouchableOpacity, ScrollView, Image, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import { Colors } from '@/constants/theme';
+import { useCart } from '@/hooks/use-cart';
+import * as Haptics from 'expo-haptics';
 
-interface OptionConfig {
-  name: string;
-  price: number;
-}
-
-interface ProductDetailsModalProps {
-  visible: boolean;
-  product: any;
-  onClose: () => void;
-  onAddToCart: (product: any, options: string[], finalPrice: number) => void;
-}
-
-export function ProductDetailsModal({ visible, product, onClose, onAddToCart }: ProductDetailsModalProps) {
+export default function ProductDetailsModal({ visible, product, onClose }: any) {
+  const { addItem } = useCart();
   const [quantity, setQuantity] = useState(1);
-  const [excludedIngredients, setExcludedIngredients] = useState<string[]>([]);
-  const [selectedExtras, setSelectedExtras] = useState<OptionConfig[]>([]);
   
+  // --- NOUVEAUX ÉTATS POUR LA NOUVELLE LOGIQUE ---
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, any>>({});
+  const [removedIngredients, setRemovedIngredients] = useState<string[]>([]);
+  
+  // Reset quand le produit change
   useEffect(() => {
     if (visible) {
       setQuantity(1);
-      setExcludedIngredients([]);
-      setSelectedExtras([]);
+      setSelectedOptions({});
+      setRemovedIngredients([]);
     }
   }, [visible, product]);
 
   if (!product) return null;
 
-  const basePrice = product.price;
-  const extrasPrice = selectedExtras.reduce((acc, extra) => acc + extra.price, 0);
-  const unitPrice = basePrice + extrasPrice;
-  const totalPrice = unitPrice * quantity;
-
-  const toggleIngredient = (ing: string) => {
-    if (excludedIngredients.includes(ing)) {
-      setExcludedIngredients(excludedIngredients.filter(i => i !== ing));
-    } else {
-      setExcludedIngredients([...excludedIngredients, ing]);
-    }
+  // --- LOGIQUE DE SÉLECTION ---
+  const handleOptionSelect = (group: any, item: any) => {
+    Haptics.selectionAsync();
+    
+    setSelectedOptions(prev => {
+      const currentSelection = prev[group.id] || [];
+      
+      if (group.type === 'single') {
+        // Radio : On remplace tout par le nouveau
+        return { ...prev, [group.id]: [item] };
+      } else {
+        // Checkbox : On ajoute ou on enlève
+        const exists = currentSelection.find((i: any) => i.id === item.id);
+        let newSelection;
+        if (exists) {
+            newSelection = currentSelection.filter((i: any) => i.id !== item.id);
+        } else {
+            newSelection = [...currentSelection, item];
+        }
+        return { ...prev, [group.id]: newSelection };
+      }
+    });
   };
 
-  const toggleExtra = (option: OptionConfig) => {
-    const exists = selectedExtras.find(e => e.name === option.name);
-    if (exists) {
-      setSelectedExtras(selectedExtras.filter(e => e.name !== option.name));
-    } else {
-      setSelectedExtras([...selectedExtras, option]);
-    }
+  const toggleIngredient = (ingId: string) => {
+      Haptics.selectionAsync();
+      setRemovedIngredients(prev => 
+        prev.includes(ingId) ? prev.filter(id => id !== ingId) : [...prev, ingId]
+      );
   };
 
-  const handleConfirm = () => {
-    const finalOptions = [
-      ...excludedIngredients.map(ing => `Sans ${ing}`),
-      ...selectedExtras.map(ex => ex.price > 0 ? `${ex.name} (+${ex.price} DH)` : ex.name)
-    ];
+  // --- CALCUL DU PRIX TOTAL ---
+  const calculateTotal = () => {
+    let total = product.price;
+    
+    // Ajout des options payantes
+    Object.values(selectedOptions).flat().forEach((opt: any) => {
+        total += (opt.price || 0);
+    });
 
-    for (let i = 0; i < quantity; i++) {
-        onAddToCart(product, finalOptions, unitPrice);
-    }
+    return total * quantity;
+  };
+
+  const handleAddToCart = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    // On prépare les options pour le panier
+    const flatOptions = Object.values(selectedOptions).flat();
+    
+    addItem({
+      ...product,
+      quantity,
+      selectedOptions: flatOptions,
+      removedIngredients, // On passe aussi ce qu'on a retiré
+      finalPrice: calculateTotal() / quantity // Prix unitaire final
+    });
     onClose();
   };
 
   return (
     <Modal animationType="slide" transparent={true} visible={visible} onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={styles.modalContainer}>
-          
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <X size={24} color="#000" />
-          </TouchableOpacity>
-
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-            <Image 
-                source={{ uri: product.image_url || 'https://via.placeholder.com/300' }} 
-                style={styles.image} 
-            />
-            
-            <View style={styles.content}>
-                <ThemedText type="title" style={styles.title}>{product.name}</ThemedText>
-                <ThemedText style={styles.price}>{basePrice} DH</ThemedText>
-                <ThemedText style={styles.description}>{product.description}</ThemedText>
-
-                <View style={styles.divider} />
-
-                {product.ingredients && product.ingredients.length > 0 && (
-                    <View style={styles.section}>
-                        <ThemedText type="subtitle" style={styles.sectionTitle}>Ingrédients</ThemedText>
-                        <ThemedText style={styles.sectionSubtitle}>Tapez pour enlever 👇</ThemedText>
-                        
-                        <View style={styles.chipsContainer}>
-                            {product.ingredients.map((ing: string, i: number) => {
-                                const isExcluded = excludedIngredients.includes(ing);
-                                return (
-                                    <TouchableOpacity 
-                                        key={i} 
-                                        style={[
-                                            styles.chip, 
-                                            isExcluded && styles.chipExcluded
-                                        ]}
-                                        onPress={() => toggleIngredient(ing)}
-                                        activeOpacity={0.8}
-                                    >
-                                        {isExcluded ? (
-                                            <X size={14} color="#999" style={{ marginRight: 4 }} />
-                                        ) : (
-                                            <Check size={14} color={THEME_COLOR} style={{ marginRight: 4 }} />
-                                        )}
-                                        <ThemedText style={[
-                                            styles.chipText, 
-                                            isExcluded && styles.chipTextExcluded
-                                        ]}>
-                                            {ing}
-                                        </ThemedText>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    </View>
-                )}
-
-                {product.options_config && product.options_config.length > 0 && (
-                    <View style={styles.section}>
-                        <ThemedText type="subtitle" style={styles.sectionTitle}>Personnaliser</ThemedText>
-                        <ThemedText style={styles.sectionSubtitle}>Envie d&apos;un petit plus ? 😋</ThemedText>
-                        
-                        {product.options_config.map((option: OptionConfig, i: number) => {
-                             const isSelected = selectedExtras.some(e => e.name === option.name);
-                             return (
-                                <TouchableOpacity 
-                                    key={i} 
-                                    style={[styles.extraRow, isSelected && styles.extraRowSelected]}
-                                    onPress={() => toggleExtra(option)}
-                                >
-                                    <View style={{flex: 1}}>
-                                        <ThemedText style={styles.extraName}>{option.name}</ThemedText>
-                                        <ThemedText style={styles.extraPrice}>
-                                            {option.price > 0 ? `+${option.price} DH` : 'Gratuit'}
-                                        </ThemedText>
-                                    </View>
-                                    <View style={[styles.checkbox, isSelected && { backgroundColor: THEME_COLOR, borderColor: THEME_COLOR }]}>
-                                        {isSelected && <Check size={16} color="white" />}
-                                    </View>
-                                </TouchableOpacity>
-                             );
-                        })}
-                    </View>
-                )}
+      <BlurView intensity={20} style={StyleSheet.absoluteFill} tint="dark" />
+      
+      <View style={styles.container}>
+        {/* Header Image */}
+        <View style={styles.imageContainer}>
+          {product.image_url ? (
+            <Image source={{ uri: product.image_url }} style={styles.image} />
+          ) : (
+            <View style={[styles.image, { backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center' }]}>
+                <Ionicons name="fast-food" size={50} color="#ccc" />
             </View>
-          </ScrollView>
+          )}
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Ionicons name="close" size={24} color="#000" />
+          </TouchableOpacity>
+        </View>
 
-          <View style={styles.footer}>
-             <View style={styles.qtyContainer}>
-                <TouchableOpacity onPress={() => quantity > 1 && setQuantity(q => q - 1)} style={styles.qtyBtn}>
-                    <Minus size={20} color="#000" />
-                </TouchableOpacity>
-                <ThemedText type="title" style={{ width: 30, textAlign: 'center' }}>{quantity}</ThemedText>
-                <TouchableOpacity onPress={() => setQuantity(q => q + 1)} style={styles.qtyBtn}>
-                    <Plus size={20} color="#000" />
-                </TouchableOpacity>
-             </View>
+        <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 120 }}>
+          {/* Info Base */}
+          <View style={styles.header}>
+            <Text style={styles.title}>{product.name}</Text>
+            <Text style={styles.price}>{product.price} DH</Text>
+          </View>
+          <Text style={styles.description}>{product.description}</Text>
 
-             <TouchableOpacity style={[styles.addButton, { backgroundColor: THEME_COLOR }]} onPress={handleConfirm}>
-                <ThemedText style={styles.addButtonText}>
-                    Ajouter {totalPrice} DH
-                </ThemedText>
-             </TouchableOpacity>
+          {/* --- SECTION INGRÉDIENTS (NOUVEAU) --- */}
+          {product.ingredients && product.ingredients.length > 0 && (
+              <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Ingrédients</Text>
+                  <Text style={styles.sectionSubtitle}>Décochez pour retirer</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                      {product.ingredients.map((ing: any) => {
+                          const isRemoved = removedIngredients.includes(ing.id);
+                          return (
+                              <TouchableOpacity 
+                                key={ing.id} 
+                                onPress={() => toggleIngredient(ing.id)}
+                                style={[
+                                    styles.ingChip, 
+                                    isRemoved && styles.ingChipRemoved
+                                ]}
+                              >
+                                  <Text style={[styles.ingText, isRemoved && styles.ingTextRemoved]}>
+                                      {isRemoved ? 'Sans ' : ''}{ing.name}
+                                  </Text>
+                                  {isRemoved && <Ionicons name="close-circle" size={16} color="red" style={{marginLeft: 4}}/>}
+                              </TouchableOpacity>
+                          )
+                      })}
+                  </View>
+              </View>
+          )}
+
+          {/* --- SECTION OPTIONS (NOUVEAU) --- */}
+          {product.option_groups && product.option_groups.map((group: any) => (
+            <View key={group.id} style={styles.section}>
+              <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center'}}>
+                  <Text style={styles.sectionTitle}>{group.name}</Text>
+                  <Text style={styles.badge}>{group.type === 'single' ? 'Obligatoire' : 'Au choix'}</Text>
+              </View>
+              
+              {group.items.map((item: any) => {
+                const isSelected = selectedOptions[group.id]?.some((i: any) => i.id === item.id);
+                
+                return (
+                  <TouchableOpacity 
+                    key={item.id} 
+                    style={[styles.optionRow, isSelected && styles.optionRowSelected]}
+                    onPress={() => handleOptionSelect(group, item)}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <Ionicons 
+                            name={group.type === 'single' 
+                                ? (isSelected ? "radio-button-on" : "radio-button-off")
+                                : (isSelected ? "checkbox" : "square-outline")
+                            } 
+                            size={20} 
+                            color={isSelected ? Colors.light.tint : '#ccc'} 
+                        />
+                        <Text style={[styles.optionText, isSelected && {fontWeight:'bold', color: Colors.light.tint}]}>
+                            {item.name}
+                        </Text>
+                    </View>
+                    <Text style={styles.optionPrice}>+{item.price} DH</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ))}
+        </ScrollView>
+
+        {/* Footer Actions */}
+        <View style={styles.footer}>
+          <View style={styles.quantityContainer}>
+            <TouchableOpacity onPress={() => setQuantity(Math.max(1, quantity - 1))} style={styles.qtyBtn}>
+              <Ionicons name="remove" size={24} color="black" />
+            </TouchableOpacity>
+            <Text style={styles.qtyText}>{quantity}</Text>
+            <TouchableOpacity onPress={() => setQuantity(quantity + 1)} style={styles.qtyBtn}>
+              <Ionicons name="add" size={24} color="black" />
+            </TouchableOpacity>
           </View>
 
+          <TouchableOpacity style={styles.addButton} onPress={handleAddToCart}>
+            <Text style={styles.addButtonText}>Ajouter • {calculateTotal()} DH</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -178,179 +199,35 @@ export function ProductDetailsModal({ visible, product, onClose, onAddToCart }: 
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: '#fff',
-    height: '90%', 
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: 'hidden',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    zIndex: 10,
-    backgroundColor: '#fff',
-    padding: 8,
-    borderRadius: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  scrollContent: {
-    paddingBottom: 100,
-  },
-  image: {
-    width: '100%',
-    height: 250,
-    resizeMode: 'cover',
-  },
-  content: {
-    padding: 20,
-  },
-  title: {
-    fontSize: 24,
-    marginBottom: 4,
-  },
-  price: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: THEME_COLOR,
-    marginBottom: 12,
-  },
-  description: {
-    color: '#666',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#f0f0f0',
-    marginBottom: 20,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 12,
-  },
-  chipsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f9f9f9',
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-  },
-  chipExcluded: {
-    backgroundColor: '#fff',
-    borderColor: '#ddd',
-    opacity: 0.6,
-  },
-  chipText: {
-    fontWeight: '600',
-    color: '#333',
-  },
-  chipTextExcluded: {
-    textDecorationLine: 'line-through',
-    color: '#999',
-  },
-  extraRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f9f9f9',
-  },
-  extraRowSelected: {
-    backgroundColor: '#fffbeb', 
-  },
-  extraName: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  extraPrice: {
-    fontSize: 13,
-    color: '#666',
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#ddd',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    padding: 20,
-    paddingBottom: 30, 
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 10,
-  },
-  qtyContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
-    padding: 4,
-    gap: 10,
-  },
-  qtyBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  addButton: {
-    flex: 1,
-    height: 50,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  }
+  container: { flex: 1, backgroundColor: '#fff', marginTop: 60, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  imageContainer: { height: 250, width: '100%', position: 'relative' },
+  image: { width: '100%', height: '100%', resizeMode: 'cover' },
+  closeButton: { position: 'absolute', top: 20, right: 20, backgroundColor: '#fff', padding: 8, borderRadius: 20 },
+  content: { flex: 1, padding: 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  title: { fontSize: 24, fontWeight: '900' },
+  price: { fontSize: 20, fontWeight: 'bold', color: Colors.light.tint },
+  description: { color: '#666', lineHeight: 20, marginBottom: 20 },
+  
+  section: { marginBottom: 24, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
+  sectionSubtitle: { fontSize: 12, color: '#999', marginBottom: 10 },
+  badge: { fontSize: 10, fontWeight:'bold', backgroundColor:'#f0f0f0', paddingHorizontal:6, paddingVertical:2, borderRadius:4, overflow:'hidden', color:'#666'},
+
+  optionRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f9f9f9' },
+  optionRowSelected: { backgroundColor: '#f9f9ff', paddingHorizontal: 4, borderRadius: 8, borderColor: Colors.light.tint, borderWidth: 0.5 },
+  optionText: { fontSize: 16, color: '#333' },
+  optionPrice: { fontWeight: 'bold', color: '#666' },
+
+  ingChip: { backgroundColor: '#e8f5e9', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#c8e6c9' },
+  ingChipRemoved: { backgroundColor: '#ffebee', borderColor: '#ffcdd2', flexDirection:'row', alignItems:'center' },
+  ingText: { color: '#2e7d32', fontWeight: '600' },
+  ingTextRemoved: { color: '#c62828', textDecorationLine: 'line-through' },
+
+  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', padding: 20, borderTopWidth: 1, borderTopColor: '#eee', flexDirection: 'row', gap: 15, paddingBottom: 40 },
+  quantityContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f5f5f5', borderRadius: 12, padding: 4 },
+  qtyBtn: { padding: 12 },
+  qtyText: { fontSize: 18, fontWeight: 'bold', marginHorizontal: 10 },
+  addButton: { flex: 1, backgroundColor: '#000', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  addButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
 });
