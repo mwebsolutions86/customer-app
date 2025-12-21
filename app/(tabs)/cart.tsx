@@ -12,26 +12,24 @@ const STORE_ID = '73b158dd-4ff1-4294-9279-0f5d98f95480';
 
 export default function CartScreen() {
   const router = useRouter();
-  const { items, removeFromCart, addToCart, clearCart, getTotalPrice } = useCart();
+  // CORRECTION 1 : On utilise les bons noms de méthodes (addItem, removeItem)
+  const { items, removeItem, addItem, clearCart, getTotalPrice } = useCart();
   
-  // Récupération des couleurs du store
   const { store } = useMenu(STORE_ID);
   const PRIMARY = store?.primary_color || '#000000';
   const SECONDARY = store?.secondary_color || '#FFFFFF';
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // États du formulaire
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
-  const [orderNote, setOrderNote] = useState(''); // ✅ NOUVEAU : État pour le commentaire
+  const [orderNote, setOrderNote] = useState('');
   
   const [orderType, setOrderType] = useState<'dine_in' | 'takeaway' | 'delivery'>('dine_in');
 
   const total = getTotalPrice();
 
-  // CHARGEMENT AUTO DES INFOS
   useEffect(() => {
     const fetchUserInfo = async () => {
         try {
@@ -61,7 +59,6 @@ export default function CartScreen() {
   const handleSubmitOrder = async () => {
     if (items.length === 0) return;
 
-    // VALIDATION
     if (!customerName.trim()) {
         Alert.alert("Oups", "Merci d'indiquer votre nom.");
         return;
@@ -85,7 +82,7 @@ export default function CartScreen() {
                 customer_name: customerName,
                 customer_phone: customerPhone,
                 delivery_address: orderType === 'delivery' ? deliveryAddress : null,
-                notes: orderNote, // ✅ ENVOI DU COMMENTAIRE
+                notes: orderNote,
                 total_amount: total,
                 status: 'pending',
                 order_type: orderType,
@@ -96,13 +93,17 @@ export default function CartScreen() {
 
         if (orderError) throw orderError;
 
+        // CORRECTION 5 : On prépare le JSON structuré pour l'Admin Panel
         const orderItems = items.map(item => ({
             order_id: order.id,
             product_id: item.id,
             product_name: item.name,
             quantity: item.quantity,
-            price: item.price,
-            options: item.options
+            price: item.finalPrice, // On utilise le prix final (base + options)
+            options: {
+                selectedOptions: item.selectedOptions || [],
+                removedIngredients: item.removedIngredients || []
+            }
         }));
 
         const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
@@ -178,16 +179,31 @@ export default function CartScreen() {
                     <Image source={item.image_url ? { uri: item.image_url } : { uri: 'https://via.placeholder.com/150' }} style={styles.itemImage} />
                     <View style={{ flex: 1 }}>
                         <Text style={[styles.itemName, { color: PRIMARY }]}>{item.name}</Text>
-                        <Text style={styles.itemPrice}>{item.price * item.quantity} DH</Text>
-                        {item.options && item.options.length > 0 && (
-                            <Text style={{ fontSize: 11, color: '#666', marginTop: 4 }}>{item.options.join(', ')}</Text>
+                        <Text style={styles.itemPrice}>{item.finalPrice * item.quantity} DH</Text>
+                        
+                        {/* CORRECTION 3 : Affichage propre des options (objets) et ingrédients retirés */}
+                        {item.selectedOptions && item.selectedOptions.length > 0 && (
+                            <Text style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
+                                + {item.selectedOptions.map((o: any) => o.name).join(', ')}
+                            </Text>
+                        )}
+                        {item.removedIngredients && item.removedIngredients.length > 0 && (
+                            <Text style={{ fontSize: 11, color: '#EF4444', marginTop: 2 }}>
+                                Sans : {item.removedIngredients.join(', ')}
+                            </Text>
                         )}
                     </View>
                     <View style={styles.quantityControl}>
-                        <TouchableOpacity onPress={() => removeFromCart(item.cartId)} style={styles.qtyBtn}><Ionicons name="remove" size={16}/></TouchableOpacity>
+                        {/* CORRECTION 4 : Utilisation de removeItem avec cartId */}
+                        <TouchableOpacity onPress={() => removeItem(item.cartId)} style={styles.qtyBtn}>
+                            <Ionicons name="remove" size={16}/>
+                        </TouchableOpacity>
+                        
                         <Text style={styles.qtyText}>{item.quantity}</Text>
+                        
+                        {/* CORRECTION 4 : Utilisation de addItem avec l'objet complet (+1 quantity) */}
                         <TouchableOpacity 
-                            onPress={() => addToCart({ ...item }, 1, item.options)} 
+                            onPress={() => addItem({ ...item, quantity: 1 })} 
                             style={[styles.qtyBtn, {backgroundColor: PRIMARY}]}
                         >
                             <Ionicons name="add" size={16} color={SECONDARY}/>
@@ -223,7 +239,6 @@ export default function CartScreen() {
                     </View>
                 )}
 
-                {/* ✅ NOUVEAU CHAMP COMMENTAIRE */}
                 <View style={[styles.inputWrapper, { alignItems: 'flex-start', marginTop: 5 }]}>
                     <Ionicons name="create-outline" size={20} color="#666" style={{marginRight: 10, marginTop: 12}} />
                     <TextInput 
