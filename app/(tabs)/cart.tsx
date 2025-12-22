@@ -7,17 +7,20 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useMenu } from '../../hooks/use-menu';
 
-// L'ID DU MAGASIN
+// L'ID DU MAGASIN (Pour le MVP)
 const STORE_ID = '73b158dd-4ff1-4294-9279-0f5d98f95480'; 
 
 export default function CartScreen() {
   const router = useRouter();
-  // CORRECTION 1 : On utilise les bons noms de méthodes (addItem, removeItem)
   const { items, removeItem, addItem, clearCart, getTotalPrice } = useCart();
   
+  // On récupère les infos du store (y compris les frais de livraison)
   const { store } = useMenu(STORE_ID);
   const PRIMARY = store?.primary_color || '#000000';
   const SECONDARY = store?.secondary_color || '#FFFFFF';
+  
+  // Frais de livraison par défaut si non chargés (fallback)
+  const STORE_DELIVERY_FEE = store?.delivery_fees || 0;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -26,9 +29,12 @@ export default function CartScreen() {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [orderNote, setOrderNote] = useState('');
   
-  const [orderType, setOrderType] = useState<'dine_in' | 'takeaway' | 'delivery'>('dine_in');
+  const [orderType, setOrderType] = useState<'dine_in' | 'takeaway' | 'delivery'>('delivery');
 
-  const total = getTotalPrice();
+  // --- CALCULS FINANCIERS ---
+  const cartTotal = getTotalPrice();
+  const deliveryFee = orderType === 'delivery' ? STORE_DELIVERY_FEE : 0;
+  const finalTotal = cartTotal + deliveryFee;
 
   useEffect(() => {
     const fetchUserInfo = async () => {
@@ -75,47 +81,39 @@ export default function CartScreen() {
     setIsSubmitting(true);
 
     try {
-        const { data: order, error: orderError } = await supabase
-            .from('orders')
-            .insert({
-                order_number: Math.floor(1000 + Math.random() * 9000),
-                customer_name: customerName,
-                customer_phone: customerPhone,
-                delivery_address: orderType === 'delivery' ? deliveryAddress : null,
-                notes: orderNote,
-                total_amount: total,
-                status: 'pending',
-                order_type: orderType,
-                store_id: STORE_ID,
-            })
-            .select()
-            .single();
-
-        if (orderError) throw orderError;
-
-        // CORRECTION 5 : On prépare le JSON structuré pour l'Admin Panel
-        const orderItems = items.map(item => ({
-            order_id: order.id,
+        const secureItems = items.map(item => ({
             product_id: item.id,
-            product_name: item.name,
             quantity: item.quantity,
-            price: item.finalPrice, // On utilise le prix final (base + options)
             options: {
                 selectedOptions: item.selectedOptions || [],
                 removedIngredients: item.removedIngredients || []
             }
         }));
 
-        const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
-        if (itemsError) throw itemsError;
+        // APPEL RPC SÉCURISÉ
+        const { data, error } = await supabase.rpc('create_order_secure', {
+            p_store_id: STORE_ID, 
+            p_customer_name: customerName,
+            p_customer_phone: customerPhone,
+            p_delivery_address: orderType === 'delivery' ? deliveryAddress : '', 
+            p_order_type: orderType,
+            p_items: secureItems
+        });
+
+        if (error) throw error;
+
+        const response = data as any;
 
         clearCart();
-        Alert.alert("Commande Envoyée ! 🚀", `Votre commande N°${order.order_number} est en cuisine.`);
+        Alert.alert(
+            "Commande Validée ! 🚀", 
+            `Votre commande N°${response.order_number} est confirmée.\nTotal à payer : ${response.total_amount} DH`
+        );
         router.push('/');
 
     } catch (error: any) {
         console.error(error);
-        Alert.alert("Erreur", error.message);
+        Alert.alert("Erreur", "Impossible de valider la commande : " + error.message);
     } finally {
         setIsSubmitting(false);
     }
@@ -144,7 +142,7 @@ export default function CartScreen() {
         </View>
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex:1}}>
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 150 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 180 }} showsVerticalScrollIndicator={false}>
             
             <Text style={[styles.sectionTitle, { color: PRIMARY }]}>Type de commande</Text>
             
@@ -181,7 +179,6 @@ export default function CartScreen() {
                         <Text style={[styles.itemName, { color: PRIMARY }]}>{item.name}</Text>
                         <Text style={styles.itemPrice}>{item.finalPrice * item.quantity} DH</Text>
                         
-                        {/* CORRECTION 3 : Affichage propre des options (objets) et ingrédients retirés */}
                         {item.selectedOptions && item.selectedOptions.length > 0 && (
                             <Text style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
                                 + {item.selectedOptions.map((o: any) => o.name).join(', ')}
@@ -194,18 +191,11 @@ export default function CartScreen() {
                         )}
                     </View>
                     <View style={styles.quantityControl}>
-                        {/* CORRECTION 4 : Utilisation de removeItem avec cartId */}
                         <TouchableOpacity onPress={() => removeItem(item.cartId)} style={styles.qtyBtn}>
                             <Ionicons name="remove" size={16}/>
                         </TouchableOpacity>
-                        
                         <Text style={styles.qtyText}>{item.quantity}</Text>
-                        
-                        {/* CORRECTION 4 : Utilisation de addItem avec l'objet complet (+1 quantity) */}
-                        <TouchableOpacity 
-                            onPress={() => addItem({ ...item, quantity: 1 })} 
-                            style={[styles.qtyBtn, {backgroundColor: PRIMARY}]}
-                        >
+                        <TouchableOpacity onPress={() => addItem({ ...item, quantity: 1 })} style={[styles.qtyBtn, {backgroundColor: PRIMARY}]}>
                             <Ionicons name="add" size={16} color={SECONDARY}/>
                         </TouchableOpacity>
                     </View>
@@ -242,7 +232,7 @@ export default function CartScreen() {
                 <View style={[styles.inputWrapper, { alignItems: 'flex-start', marginTop: 5 }]}>
                     <Ionicons name="create-outline" size={20} color="#666" style={{marginRight: 10, marginTop: 12}} />
                     <TextInput 
-                        placeholder="Instructions spéciales (Allergies, Code porte, Sans oignons...)" 
+                        placeholder="Instructions spéciales..." 
                         style={[styles.input, { height: 80, textAlignVertical: 'top', paddingTop: 10 }]} 
                         value={orderNote}
                         onChangeText={setOrderNote}
@@ -250,16 +240,35 @@ export default function CartScreen() {
                         numberOfLines={3}
                     />
                 </View>
-
             </View>
 
         </ScrollView>
         </KeyboardAvoidingView>
 
+        {/* --- FOOTER AMÉLIORÉ --- */}
         <View style={styles.footer}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
-                <Text style={{ fontSize: 18, color: '#666' }}>Total</Text>
-                <Text style={{ fontSize: 24, fontWeight: '900', color: '#111' }}>{total} <Text style={{fontSize: 14}}>DH</Text></Text>
+            <View style={{ marginBottom: 16 }}>
+                {/* Ligne Sous-total */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <Text style={{ fontSize: 16, color: '#666' }}>Sous-total</Text>
+                    <Text style={{ fontSize: 16, fontWeight: '600' }}>{cartTotal.toFixed(2)} DH</Text>
+                </View>
+                
+                {/* Ligne Livraison (Conditionnelle) */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <Text style={{ fontSize: 16, color: '#666' }}>Livraison</Text>
+                    {orderType === 'delivery' ? (
+                         <Text style={{ fontSize: 16, fontWeight: '600' }}>{deliveryFee.toFixed(2)} DH</Text>
+                    ) : (
+                         <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#16A34A', backgroundColor: '#DCFCE7', paddingHorizontal: 6, borderRadius: 4 }}>OFFERTE</Text>
+                    )}
+                </View>
+
+                {/* Ligne Total Final */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f0f0f0' }}>
+                    <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#111' }}>Total</Text>
+                    <Text style={{ fontSize: 24, fontWeight: '900', color: PRIMARY }}>{finalTotal.toFixed(2)} <Text style={{fontSize: 14, color: '#111'}}>DH</Text></Text>
+                </View>
             </View>
             
             <TouchableOpacity 
