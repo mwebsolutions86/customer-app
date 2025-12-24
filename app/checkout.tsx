@@ -15,7 +15,6 @@ export default function CheckoutScreen() {
   const colorScheme = useColorScheme();
   const themeColors = Colors[colorScheme ?? 'light'];
   
-  // On récupère le panier complet
   const { items, getTotalPrice, clearCart } = useCart();
   
   const [loading, setLoading] = useState(false);
@@ -29,43 +28,43 @@ export default function CheckoutScreen() {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission refusée', 'La géolocalisation est nécessaire pour la livraison.');
+        Alert.alert('Permission refusée', 'La géolocalisation est nécessaire.');
         return;
       }
-      
       setIsCheckingZone(true);
       try {
         let location = await Location.getCurrentPositionAsync({});
         setUserLocation(location);
-        
-        // Appel RPC pour vérifier la zone (si votre backend le gère)
-        const { data, error } = await supabase.rpc('check_delivery_availability', {
-          p_store_id: CURRENT_STORE_ID,
-          p_lat: location.coords.latitude,
-          p_lng: location.coords.longitude
-        });
-
-        if (!error && data && data[0]?.is_available) {
-          setDeliveryFee(data[0].delivery_fee);
-        } else {
-          // Fallback simple si le RPC n'existe pas encore ou erreur
-          setDeliveryFee(10); // Frais par défaut
-        }
+        setDeliveryFee(10); // Simulation frais
       } catch (err) {
-        console.log("Zone check skipped or failed", err);
-        setDeliveryFee(10); // Fallback
+        setDeliveryFee(10);
       } finally {
         setIsCheckingZone(false);
       }
     })();
   }, []);
 
+  // ✅ HELPER: Regrouper les options
+  const renderGroupedOptions = (options: any[]) => {
+    if (!options || options.length === 0) return null;
+    const counts = options.reduce((acc: any, opt: any) => {
+        const key = opt.id || opt.name;
+        if (!acc[key]) acc[key] = { ...opt, count: 0 };
+        acc[key].count += 1;
+        return acc;
+    }, {});
+
+    return Object.values(counts).map((opt: any, i: number) => (
+        <ThemedText key={i} style={{fontSize:12, color:'#666', marginLeft:20, marginTop: 2}}>
+            + {opt.count > 1 ? `${opt.count}x ` : ''}{opt.name}
+        </ThemedText>
+    ));
+  };
+
   const handlePlaceOrder = async () => {
     if (items.length === 0) return;
-    
-    // Sécurité: Si pas de loc, on demande une confirmation ou on bloque (ici on bloque pour l'exemple)
     if (!userLocation) {
-        Alert.alert("Localisation requise", "Nous avons besoin de votre position pour livrer.");
+        Alert.alert("Localisation requise", "Nous avons besoin de votre position.");
         return;
     }
 
@@ -74,63 +73,30 @@ export default function CheckoutScreen() {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error("Veuillez vous connecter");
 
-      // --- CONSTRUCTION DU PAQUET COMMANDE (LE FIX EST ICI) ---
+      // --- Construction Paquet Commande ---
       const rpcItems = items.map(item => ({
         product_id: item.id,
+        product_name: item.name, // ✅ Important
         quantity: item.quantity,
-        price: item.finalPrice, // On envoie le prix calculé (base + options)
-        // ON ENVOIE L'OBJET COMPLET POUR L'ADMIN PANEL
+        unit_price: item.finalPrice, // ✅ Important
+        total_price: item.finalPrice * item.quantity,
         options: {
             selectedOptions: item.selectedOptions || [],
             removedIngredients: item.removedIngredients || []
         }
       }));
 
-      // On utilise l'insertion directe si le RPC 'create_order_secure' n'est pas à jour
-      // C'est plus sûr pour tester immédiatement
-      const { error: insertError } = await supabase
-        .from('orders')
-        .insert({
-            store_id: CURRENT_STORE_ID,
-            user_id: user.id,
-            total_amount: cartTotal + deliveryFee,
-            delivery_fee_applied: deliveryFee,
-            status: 'pending',
-            order_type: 'delivery',
-            payment_method: 'cash',
-            payment_status: 'pending',
-            delivery_address: "Position GPS", // Idéalement faire un Reverse Geocoding ici
-            location: `POINT(${userLocation.coords.longitude} ${userLocation.coords.latitude})`,
-            customer_name: user.user_metadata?.full_name || "Client App",
-            customer_phone: user.user_metadata?.phone || ""
-        })
-        .select()
-        .single();
+      // Appel RPC
+      const { error } = await supabase.rpc('create_order_secure', {
+            p_store_id: CURRENT_STORE_ID,
+            p_customer_name: user.user_metadata?.full_name || "Client App",
+            p_customer_phone: user.user_metadata?.phone || "",
+            p_delivery_address: "Position GPS", 
+            p_order_type: 'delivery',
+            p_items: rpcItems
+      });
 
-      if (insertError) throw insertError;
-
-      // Si l'insertion commande réussit, on insère les items
-      // Note: Idéalement faire via RPC pour atomicité, mais ceci débloque la situation
-      const { data: orderData } = await supabase
-        .from('orders')
-        .select('id')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (orderData) {
-          const itemsToInsert = rpcItems.map(i => ({
-              order_id: orderData.id,
-              product_id: i.product_id,
-              quantity: i.quantity,
-              price: i.price,
-              product_name: items.find(it => it.id === i.product_id)?.name || "Produit",
-              options: i.options // Supabase va le convertir en JSONB automatiquement
-          }));
-
-          const { error: itemsError } = await supabase.from('order_items').insert(itemsToInsert);
-          if (itemsError) throw itemsError;
-      }
+      if (error) throw error;
 
       clearCart();
       Alert.alert('Succès', 'Votre commande est en cuisine ! 👨‍🍳', [
@@ -139,19 +105,11 @@ export default function CheckoutScreen() {
 
     } catch (error: any) {
       console.error(error);
-      Alert.alert('Erreur', error.message || "Impossible de passer la commande");
+      Alert.alert('Erreur', error.message);
     } finally {
       setLoading(false);
     }
   };
-
-  if (items.length === 0) {
-    return (
-      <ThemedView style={styles.container}>
-        <ThemedText style={{ textAlign: 'center', marginTop: 50 }}>Votre panier est vide.</ThemedText>
-      </ThemedView>
-    );
-  }
 
   return (
     <ThemedView style={styles.container}>
@@ -161,17 +119,27 @@ export default function CheckoutScreen() {
         <View style={styles.section}>
           <ThemedText type="subtitle" style={{marginBottom:10}}>Récapitulatif</ThemedText>
           {items.map((item, idx) => (
-              <View key={idx} style={{marginBottom:10}}>
+              <View key={idx} style={{marginBottom:15}}>
                   <View style={styles.itemRow}>
                     <ThemedText style={{fontWeight:'bold'}}>{item.quantity}x {item.name}</ThemedText>
                     <ThemedText>{(item.finalPrice * item.quantity).toFixed(2)} DH</ThemedText>
                   </View>
-                  {/* Affichage Debug pour être sûr */}
-                  {item.selectedOptions?.map((opt:any, i:number) => (
-                      <ThemedText key={i} style={{fontSize:12, color:'#666', marginLeft:20}}>+ {opt.name}</ThemedText>
-                  ))}
+                  
+                  {/* Affichage Taille */}
+                  {item.selectedVariation && (
+                      <ThemedText style={{fontSize:12, color:'#666', marginLeft:20, fontStyle:'italic'}}>
+                          Taille: {item.selectedVariation.name}
+                      </ThemedText>
+                  )}
+
+                  {/* Affichage Options Groupées */}
+                  {renderGroupedOptions(item.selectedOptions)}
+
+                  {/* Affichage Ingrédients Retirés */}
                   {item.removedIngredients?.map((ing:string, i:number) => (
-                      <ThemedText key={i} style={{fontSize:12, color:'red', marginLeft:20}}>- Sans {ing}</ThemedText>
+                      <ThemedText key={i} style={{fontSize:12, color:'#EF4444', marginLeft:20}}>
+                          - Sans {ing}
+                      </ThemedText>
                   ))}
               </View>
           ))}
@@ -202,7 +170,7 @@ export default function CheckoutScreen() {
           onPress={handlePlaceOrder}
           disabled={loading || isCheckingZone}
         >
-          {loading ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.orderButtonText}>Commander (Cash)</ThemedText>}
+          {loading ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.orderButtonText}>Commander</ThemedText>}
         </TouchableOpacity>
       </View>
     </ThemedView>

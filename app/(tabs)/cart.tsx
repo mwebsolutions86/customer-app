@@ -7,74 +7,77 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useMenu } from '../../hooks/use-menu';
 
-// L'ID DU MAGASIN (Pour le MVP)
 const STORE_ID = '73b158dd-4ff1-4294-9279-0f5d98f95480'; 
 
 export default function CartScreen() {
   const router = useRouter();
   const { items, removeItem, addItem, clearCart, getTotalPrice } = useCart();
-  
-  // On récupère les infos du store (y compris les frais de livraison)
   const { store } = useMenu(STORE_ID);
+  
   const PRIMARY = store?.primary_color || '#000000';
   const SECONDARY = store?.secondary_color || '#FFFFFF';
-  
-  // Frais de livraison par défaut si non chargés (fallback)
   const STORE_DELIVERY_FEE = store?.delivery_fees || 0;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [orderNote, setOrderNote] = useState('');
-  
   const [orderType, setOrderType] = useState<'dine_in' | 'takeaway' | 'delivery'>('delivery');
 
-  // --- CALCULS FINANCIERS ---
   const cartTotal = getTotalPrice();
   const deliveryFee = orderType === 'delivery' ? STORE_DELIVERY_FEE : 0;
   const finalTotal = cartTotal + deliveryFee;
 
   useEffect(() => {
     const fetchUserInfo = async () => {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            
-            if (user) {
-                const { data: profile } = await supabase
-                    .from('cust_profiles')
-                    .select('*')
-                    .eq('id', user.id)
-                    .single();
-
-                if (profile) {
-                    if (profile.full_name) setCustomerName(profile.full_name);
-                    if (profile.phone) setCustomerPhone(profile.phone);
-                    if (profile.address) setDeliveryAddress(profile.address); 
-                } 
-            }
-        } catch (err) {
-            console.log("Info: Profil non chargé", err);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data } = await supabase.from('cust_profiles').select('*').eq('id', user.id).single();
+            if (data) {
+                setCustomerName(data.full_name || '');
+                setCustomerPhone(data.phone || '');
+                setDeliveryAddress(data.address || ''); 
+            } 
         }
     };
-
     fetchUserInfo();
   }, []);
 
+  // ✅ HELPER: Regrouper les options identiques (ex: 2x Mayo)
+  const renderGroupedOptions = (options: any[]) => {
+    if (!options || options.length === 0) return null;
+
+    // On compte les occurrences
+    const counts = options.reduce((acc: any, opt: any) => {
+        const key = opt.id || opt.name;
+        if (!acc[key]) acc[key] = { ...opt, count: 0 };
+        acc[key].count += 1;
+        return acc;
+    }, {});
+
+    return (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+            {Object.values(counts).map((opt: any, idx) => (
+                <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#DBEAFE' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>
+                        {opt.count > 1 ? `${opt.count}x ` : '+ '}
+                        {opt.name}
+                    </Text>
+                </View>
+            ))}
+        </View>
+    );
+  };
+
   const handleSubmitOrder = async () => {
     if (items.length === 0) return;
-
-    if (!customerName.trim()) {
-        Alert.alert("Oups", "Merci d'indiquer votre nom.");
-        return;
-    }
-    if (!customerPhone.trim()) {
-        Alert.alert("Oups", "Merci d'indiquer votre téléphone.");
+    if (!customerName.trim() || !customerPhone.trim()) {
+        Alert.alert("Oups", "Nom et téléphone requis.");
         return;
     }
     if (orderType === 'delivery' && !deliveryAddress.trim()) {
-        Alert.alert("Adresse manquante", "Veuillez entrer une adresse de livraison.");
+        Alert.alert("Oups", "Adresse de livraison requise.");
         return;
     }
 
@@ -83,37 +86,34 @@ export default function CartScreen() {
     try {
         const secureItems = items.map(item => ({
             product_id: item.id,
+            product_name: item.name, 
             quantity: item.quantity,
+            unit_price: item.finalPrice, 
+            total_price: item.finalPrice * item.quantity, 
             options: {
                 selectedOptions: item.selectedOptions || [],
                 removedIngredients: item.removedIngredients || []
             }
         }));
 
-        // APPEL RPC SÉCURISÉ
         const { data, error } = await supabase.rpc('create_order_secure', {
             p_store_id: STORE_ID, 
             p_customer_name: customerName,
             p_customer_phone: customerPhone,
             p_delivery_address: orderType === 'delivery' ? deliveryAddress : '', 
             p_order_type: orderType,
-            p_items: secureItems
+            p_items: secureItems,
+            p_notes: orderNote
         });
 
         if (error) throw error;
-
         const response = data as any;
-
         clearCart();
-        Alert.alert(
-            "Commande Validée ! 🚀", 
-            `Votre commande N°${response.order_number} est confirmée.\nTotal à payer : ${response.total_amount} DH`
-        );
+        Alert.alert("Succès", `Commande N°${response.order_number || ''} envoyée !`);
         router.push('/');
 
     } catch (error: any) {
-        console.error(error);
-        Alert.alert("Erreur", "Impossible de valider la commande : " + error.message);
+        Alert.alert("Erreur", error.message);
     } finally {
         setIsSubmitting(false);
     }
@@ -145,24 +145,13 @@ export default function CartScreen() {
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 180 }} showsVerticalScrollIndicator={false}>
             
             <Text style={[styles.sectionTitle, { color: PRIMARY }]}>Type de commande</Text>
-            
             <View style={styles.typeSelector}>
                 {['dine_in', 'takeaway', 'delivery'].map((type) => {
                     const isActive = orderType === type;
-                    let label = "Sur Place";
-                    let icon = "restaurant";
-                    if(type === 'takeaway') { label = "Emporter"; icon = "bag-handle"; }
-                    if(type === 'delivery') { label = "Livraison"; icon = "bicycle"; }
-
+                    let label = type === 'takeaway' ? "Emporter" : type === 'delivery' ? "Livraison" : "Sur Place";
+                    let icon = type === 'takeaway' ? "bag-handle" : type === 'delivery' ? "bicycle" : "restaurant";
                     return (
-                        <TouchableOpacity 
-                            key={type}
-                            onPress={() => setOrderType(type as any)} 
-                            style={[
-                                styles.typeBtn, 
-                                isActive && { backgroundColor: PRIMARY, borderColor: PRIMARY }
-                            ]}
-                        >
+                        <TouchableOpacity key={type} onPress={() => setOrderType(type as any)} style={[styles.typeBtn, isActive && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}>
                             <Ionicons name={icon as any} size={20} color={isActive ? SECONDARY : 'black'} />
                             <Text style={[styles.typeText, isActive && { color: SECONDARY }]}>{label}</Text>
                         </TouchableOpacity>
@@ -177,19 +166,31 @@ export default function CartScreen() {
                     <Image source={item.image_url ? { uri: item.image_url } : { uri: 'https://via.placeholder.com/150' }} style={styles.itemImage} />
                     <View style={{ flex: 1 }}>
                         <Text style={[styles.itemName, { color: PRIMARY }]}>{item.name}</Text>
+                        
+                        {/* Affichage Taille */}
+                        {item.selectedVariation && (
+                             <Text style={{ fontSize: 12, fontWeight: '600', color: '#4B5563', marginBottom: 2 }}>
+                                Taille: {item.selectedVariation.name}
+                             </Text>
+                        )}
+
                         <Text style={styles.itemPrice}>{item.finalPrice * item.quantity} DH</Text>
                         
-                        {item.selectedOptions && item.selectedOptions.length > 0 && (
-                            <Text style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
-                                + {item.selectedOptions.map((o: any) => o.name).join(', ')}
-                            </Text>
-                        )}
+                        {/* ✅ Affichage Groupé des Options */}
+                        {renderGroupedOptions(item.selectedOptions)}
+
+                        {/* Ingrédients retirés */}
                         {item.removedIngredients && item.removedIngredients.length > 0 && (
-                            <Text style={{ fontSize: 11, color: '#EF4444', marginTop: 2 }}>
-                                Sans : {item.removedIngredients.join(', ')}
-                            </Text>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                                {item.removedIngredients.map((ing, idx) => (
+                                    <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#FEE2E2' }}>
+                                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#DC2626' }}>Sans {ing}</Text>
+                                    </View>
+                                ))}
+                            </View>
                         )}
                     </View>
+                    
                     <View style={styles.quantityControl}>
                         <TouchableOpacity onPress={() => removeItem(item.cartId)} style={styles.qtyBtn}>
                             <Ionicons name="remove" size={16}/>
@@ -203,83 +204,39 @@ export default function CartScreen() {
             ))}
 
             <View style={styles.formSection}>
-                <Text style={[styles.sectionTitle, { color: PRIMARY }]}>Vos Coordonnées</Text>
-                
+                <Text style={[styles.sectionTitle, { color: PRIMARY }]}>Coordonnées</Text>
                 <View style={styles.inputWrapper}>
                     <Ionicons name="person-outline" size={20} color="#666" style={{marginRight: 10}} />
                     <TextInput placeholder="Nom complet" style={styles.input} value={customerName} onChangeText={setCustomerName} />
                 </View>
-
                 <View style={styles.inputWrapper}>
                     <Ionicons name="call-outline" size={20} color="#666" style={{marginRight: 10}} />
                     <TextInput placeholder="Téléphone" style={styles.input} keyboardType="phone-pad" value={customerPhone} onChangeText={setCustomerPhone} />
                 </View>
-                
                 {orderType === 'delivery' && (
                     <View style={[styles.inputWrapper, { alignItems: 'flex-start' }]}>
                         <Ionicons name="location-outline" size={20} color="#666" style={{marginRight: 10, marginTop: 12}} />
-                        <TextInput 
-                            placeholder="Adresse de livraison complète..." 
-                            style={[styles.input, { height: 80, textAlignVertical: 'top', paddingTop: 10 }]} 
-                            value={deliveryAddress}
-                            onChangeText={setDeliveryAddress}
-                            multiline
-                            numberOfLines={3}
-                        />
+                        <TextInput placeholder="Adresse..." style={[styles.input, { height: 60 }]} value={deliveryAddress} onChangeText={setDeliveryAddress} multiline />
                     </View>
                 )}
-
                 <View style={[styles.inputWrapper, { alignItems: 'flex-start', marginTop: 5 }]}>
                     <Ionicons name="create-outline" size={20} color="#666" style={{marginRight: 10, marginTop: 12}} />
-                    <TextInput 
-                        placeholder="Instructions spéciales..." 
-                        style={[styles.input, { height: 80, textAlignVertical: 'top', paddingTop: 10 }]} 
-                        value={orderNote}
-                        onChangeText={setOrderNote}
-                        multiline
-                        numberOfLines={3}
-                    />
+                    <TextInput placeholder="Note cuisine..." style={[styles.input, { height: 60 }]} value={orderNote} onChangeText={setOrderNote} multiline />
                 </View>
             </View>
 
         </ScrollView>
         </KeyboardAvoidingView>
 
-        {/* --- FOOTER AMÉLIORÉ --- */}
         <View style={styles.footer}>
-            <View style={{ marginBottom: 16 }}>
-                {/* Ligne Sous-total */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-                    <Text style={{ fontSize: 16, color: '#666' }}>Sous-total</Text>
-                    <Text style={{ fontSize: 16, fontWeight: '600' }}>{cartTotal.toFixed(2)} DH</Text>
-                </View>
-                
-                {/* Ligne Livraison (Conditionnelle) */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <Text style={{ fontSize: 16, color: '#666' }}>Livraison</Text>
-                    {orderType === 'delivery' ? (
-                         <Text style={{ fontSize: 16, fontWeight: '600' }}>{deliveryFee.toFixed(2)} DH</Text>
-                    ) : (
-                         <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#16A34A', backgroundColor: '#DCFCE7', paddingHorizontal: 6, borderRadius: 4 }}>OFFERTE</Text>
-                    )}
-                </View>
-
-                {/* Ligne Total Final */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f0f0f0' }}>
-                    <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#111' }}>Total</Text>
-                    <Text style={{ fontSize: 24, fontWeight: '900', color: PRIMARY }}>{finalTotal.toFixed(2)} <Text style={{fontSize: 14, color: '#111'}}>DH</Text></Text>
-                </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111' }}>Total</Text>
+                <Text style={{ fontSize: 22, fontWeight: '900', color: PRIMARY }}>{finalTotal.toFixed(2)} DH</Text>
             </View>
-            
-            <TouchableOpacity 
-                style={[styles.checkoutButton, { backgroundColor: PRIMARY }]} 
-                onPress={handleSubmitOrder} 
-                disabled={isSubmitting}
-            >
+            <TouchableOpacity style={[styles.checkoutButton, { backgroundColor: PRIMARY }]} onPress={handleSubmitOrder} disabled={isSubmitting}>
                 {isSubmitting ? <ActivityIndicator color={SECONDARY} /> : <Text style={[styles.checkoutText, {color: SECONDARY}]}>Valider la commande</Text>}
             </TouchableOpacity>
         </View>
-
       </SafeAreaView>
     </View>
   );

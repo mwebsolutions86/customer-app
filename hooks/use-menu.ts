@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
-// --- TYPES MIS À JOUR (Synchronisés avec Admin) ---
+// --- TYPES ---
 export interface OptionItem {
   id: string;
   name: string;
@@ -13,8 +13,8 @@ export interface OptionGroup {
   id: string;
   name: string;
   type: 'single' | 'multiple';
-  min: number; // NOUVEAU
-  max: number; // NOUVEAU
+  min: number;
+  max: number;
   items: OptionItem[];
 }
 
@@ -22,6 +22,12 @@ export interface Ingredient {
   id: string;
   name: string;
   is_available: boolean;
+}
+
+export interface Variation { // ✅ NOUVEAU TYPE
+  id: string;
+  name: string;
+  price: number;
 }
 
 export interface Product {
@@ -33,6 +39,8 @@ export interface Product {
   category_id: string;
   ingredients: Ingredient[]; 
   option_groups: OptionGroup[];
+  variations: Variation[]; // ✅ AJOUT DES VARIANTES
+  type: 'simple' | 'variable'; // Pour savoir comment afficher le prix
 }
 
 export interface Category {
@@ -64,12 +72,14 @@ export const useMenu = (storeId: string) => {
       if (storeData) {
           setStore(storeData as Store);
 
+          // ✅ REQUÊTE MISE À JOUR : On inclut 'product_variations'
           const { data: cats, error } = await supabase
           .from('categories')
           .select(`
               id, name, rank, image_url,
               products (
-                id, name, description, price, image_url, created_at, is_available,
+                id, name, description, price, image_url, created_at, is_available, type,
+                product_variations (id, name, price), 
                 product_option_links (
                   group: option_groups (
                     id, name, type, min_selection, max_selection,
@@ -93,9 +103,11 @@ export const useMenu = (storeId: string) => {
                     .filter((p: any) => p.is_available !== false)
                     .map((prod: any) => ({
                         ...prod,
+                        // ✅ On mappe les variantes et on les trie par prix
+                        variations: prod.product_variations?.sort((a:any, b:any) => a.price - b.price) || [],
+                        
                         option_groups: prod.product_option_links?.map((link: any) => ({
                             ...link.group,
-                            // MAPPING CRITIQUE : On transforme les noms DB vers Front
                             min: link.group?.min_selection || 0,
                             max: link.group?.max_selection || 1,
                             items: link.group?.items?.sort((a:any, b:any) => a.price - b.price) || []
@@ -118,9 +130,11 @@ export const useMenu = (storeId: string) => {
   useEffect(() => {
     if (!storeId) return;
     fetchMenuData();
+    // Écouteurs temps réel
     const channel = supabase.channel('menu-updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, fetchMenuData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'option_groups' }, fetchMenuData) // Écouter les changements de règles
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_variations' }, fetchMenuData) 
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'option_groups' }, fetchMenuData)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [storeId, fetchMenuData]);

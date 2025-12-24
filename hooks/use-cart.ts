@@ -2,17 +2,19 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Définition complète d'un article panier (Support Options + Ingrédients)
+// ✅ Définition complète d'un article panier (Mise à jour)
 export interface CartItem {
-  cartId: string; // ID unique (Produit + Options + Ingrédients)
+  cartId: string; 
   id: string;
   name: string;
-  price: number;       // Prix de base
-  finalPrice: number;  // Prix avec options incluses
+  price: number;       
+  finalPrice: number;  
   quantity: number;
   image_url: string | null;
   selectedOptions: any[];      
-  removedIngredients: string[]; 
+  removedIngredients: string[];
+  // 👇 Le champ manquant est ajouté ici
+  selectedVariation?: { id: string; name: string; price: number } | null;
 }
 
 interface CartState {
@@ -30,8 +32,10 @@ export const useCart = create<CartState>()(
 
       addItem: (payload) => {
         set((state) => {
-          // GÉNÉRATION D'UN ID UNIQUE "FOOD TECH"
-          // Trie les options et ingrédients pour garantir que "Burger+Frites" == "Burger+Frites"
+          // 1. Génération ID Unique "Food Tech"
+          // On inclut la variante, les options et les ingrédients dans la clé unique
+          const variationId = payload.selectedVariation ? payload.selectedVariation.id : 'base';
+          
           const optionsStr = JSON.stringify(
               (payload.selectedOptions || []).sort((a: any, b: any) => (a.id || '').localeCompare(b.id || ''))
           );
@@ -39,16 +43,17 @@ export const useCart = create<CartState>()(
               (payload.removedIngredients || []).sort()
           );
           
-          const cartId = `${payload.id}-${optionsStr}-${ingredientsStr}`;
+          // ID = ID_Produit + ID_Variante + Options + Ingrédients
+          const cartId = `${payload.id}-${variationId}-${optionsStr}-${ingredientsStr}`;
 
           const existingItemIndex = state.items.findIndex((item) => item.cartId === cartId);
           let updatedItems = [...state.items];
 
           if (existingItemIndex > -1) {
-            // Si exactement le même produit existe, on augmente la quantité
+            // Produit identique trouvé : on incrémente la quantité
             updatedItems[existingItemIndex].quantity += payload.quantity;
           } else {
-            // Sinon, on ajoute une nouvelle ligne
+            // Nouveau produit : on l'ajoute
             updatedItems.push({
               cartId,
               id: payload.id,
@@ -58,7 +63,8 @@ export const useCart = create<CartState>()(
               image_url: payload.image_url,
               quantity: payload.quantity,
               selectedOptions: payload.selectedOptions || [],
-              removedIngredients: payload.removedIngredients || []
+              removedIngredients: payload.removedIngredients || [],
+              selectedVariation: payload.selectedVariation || null // ✅ On stocke la variante
             });
           }
           return { items: updatedItems };
@@ -79,8 +85,8 @@ export const useCart = create<CartState>()(
       }
     }),
     {
-      name: 'food-tech-cart-storage', // Nom unique pour le stockage
-      storage: createJSONStorage(() => AsyncStorage), // Utilisation du stockage natif
+      name: 'food-tech-cart-storage',
+      storage: createJSONStorage(() => AsyncStorage),
     }
   )
 );
