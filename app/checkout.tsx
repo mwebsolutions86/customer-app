@@ -23,7 +23,7 @@ export default function CheckoutScreen() {
   const [isCheckingZone, setIsCheckingZone] = useState(false);
 
   const cartTotal = getTotalPrice();
-
+  
   useEffect(() => {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
@@ -76,13 +76,19 @@ export default function CheckoutScreen() {
       // --- Construction Paquet Commande ---
       const rpcItems = items.map(item => ({
         product_id: item.id,
-        product_name: item.name, // ✅ Important
+        product_name: item.name, 
         quantity: item.quantity,
-        unit_price: item.finalPrice, // ✅ Important
+        unit_price: item.finalPrice, 
         total_price: item.finalPrice * item.quantity,
+        
+        // ✅ CORRECTION APPLIQUÉE ICI : Mapping JSON strict pour le POS
         options: {
-            selectedOptions: item.selectedOptions || [],
-            removedIngredients: item.removedIngredients || []
+            // Injection explicite de la variante
+            variation: item.selectedVariation || null,
+            // Clé 'options' pour les suppléments
+            options: item.selectedOptions || [],
+            // Clé snake_case pour les ingrédients retirés
+            removed_ingredients: item.removedIngredients || []
         }
       }));
 
@@ -94,6 +100,7 @@ export default function CheckoutScreen() {
             p_delivery_address: "Position GPS", 
             p_order_type: 'delivery',
             p_items: rpcItems
+            
       });
 
       if (error) throw error;
