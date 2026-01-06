@@ -6,13 +6,13 @@ import { useCart } from '../../hooks/use-cart';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useMenu } from '../../hooks/use-menu';
-
-const STORE_ID = '73b158dd-4ff1-4294-9279-0f5d98f95480'; 
+import { useStore } from '../../context/StoreProvider';
 
 export default function CartScreen() {
   const router = useRouter();
+  const { currentStore } = useStore();
   const { items, removeItem, addItem, clearCart, getTotalPrice } = useCart();
-  const { store } = useMenu(STORE_ID);
+  const { store } = useMenu(currentStore?.id || '');
   
   const PRIMARY = store?.primary_color || '#000000';
   const SECONDARY = store?.secondary_color || '#FFFFFF';
@@ -97,7 +97,7 @@ export default function CartScreen() {
         }));
 
         const { data, error } = await supabase.rpc('create_order_secure', {
-            p_store_id: STORE_ID, 
+            p_store_id: currentStore?.id || 'default-store-id', 
             p_customer_name: customerName,
             p_customer_phone: customerPhone,
             p_delivery_address: orderType === 'delivery' ? deliveryAddress : '', 

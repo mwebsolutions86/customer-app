@@ -3,13 +3,12 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useMenu } from '../../hooks/use-menu'; // 1. Import du hook
 import { ActivityIndicator, View } from 'react-native';
-
-// ⚠️ TON ID STORE
-const STORE_ID = '73b158dd-4ff1-4294-9279-0f5d98f95480'; 
+import { useStore } from '../../context/StoreProvider';
 
 export default function TabLayout() {
-  // 2. Récupération de la couleur
-  const { store, loading } = useMenu(STORE_ID);
+  // 2. Récupération du store depuis le contexte
+  const { currentStore } = useStore();
+  const { store, loading } = useMenu(currentStore?.id || '');
   const PRIMARY = store?.primary_color || '#000000';
 
   // Petit chargement pour éviter le flash noir

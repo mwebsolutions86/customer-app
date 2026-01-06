@@ -7,13 +7,14 @@ import { useCart } from '@/hooks/use-cart';
 import { supabase } from '@/lib/supabase';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { CURRENT_STORE_ID } from '@/lib/constants';
 import * as Location from 'expo-location';
+import { useStore } from '@/context/StoreProvider';
 
 export default function CheckoutScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const themeColors = Colors[colorScheme ?? 'light'];
+  const { currentStore } = useStore();
   
   const { items, getTotalPrice, clearCart } = useCart();
   
@@ -23,6 +24,8 @@ export default function CheckoutScreen() {
   const [isCheckingZone, setIsCheckingZone] = useState(false);
 
   const cartTotal = getTotalPrice();
+  // ✅ Calcul du total final (Panier + Livraison) pour l'envoyer au backend
+  const finalTotal = cartTotal + deliveryFee;
   
   useEffect(() => {
     (async () => {
@@ -35,7 +38,7 @@ export default function CheckoutScreen() {
       try {
         let location = await Location.getCurrentPositionAsync({});
         setUserLocation(location);
-        setDeliveryFee(10); // Simulation frais
+        setDeliveryFee(10); // Simulation frais (À remplacer par votre logique de zone)
       } catch (err) {
         setDeliveryFee(10);
       } finally {
@@ -44,7 +47,7 @@ export default function CheckoutScreen() {
     })();
   }, []);
 
-  // ✅ HELPER: Regrouper les options
+  // ✅ HELPER: Regrouper les options pour l'affichage
   const renderGroupedOptions = (options: any[]) => {
     if (!options || options.length === 0) return null;
     const counts = options.reduce((acc: any, opt: any) => {
@@ -81,26 +84,29 @@ export default function CheckoutScreen() {
         unit_price: item.finalPrice, 
         total_price: item.finalPrice * item.quantity,
         
-        // ✅ CORRECTION APPLIQUÉE ICI : Mapping JSON strict pour le POS
+        // ✅ STRUCTURE JSON STRICTE POUR LE POS/ADMIN
         options: {
-            // Injection explicite de la variante
-            variation: item.selectedVariation || null,
-            // Clé 'options' pour les suppléments
-            options: item.selectedOptions || [],
-            // Clé snake_case pour les ingrédients retirés
-            removed_ingredients: item.removedIngredients || []
+            variation: item.selectedVariation || null,        // Objet {id, name, price}
+            options: item.selectedOptions || [],              // Array d'objets
+            removed_ingredients: item.removedIngredients || [] // Array de strings
         }
       }));
 
       // Appel RPC
+      if (!currentStore) {
+        Alert.alert('Erreur', 'Store non sélectionné');
+        return;
+      }
+      
       const { error } = await supabase.rpc('create_order_secure', {
-            p_store_id: CURRENT_STORE_ID,
+            p_store_id: currentStore.id,
             p_customer_name: user.user_metadata?.full_name || "Client App",
             p_customer_phone: user.user_metadata?.phone || "",
             p_delivery_address: "Position GPS", 
             p_order_type: 'delivery',
-            p_items: rpcItems
-            
+            p_items: rpcItems,
+            // 👇 AJOUT CRITIQUE : On envoie le total calculé pour l'affichage POS
+            p_total_amount: finalTotal
       });
 
       if (error) throw error;
@@ -166,7 +172,7 @@ export default function CheckoutScreen() {
           
           <View style={styles.totalRow}>
             <ThemedText type="subtitle">Total à payer</ThemedText>
-            <ThemedText type="subtitle" style={{ color: themeColors.tint }}>{(cartTotal + deliveryFee).toFixed(2)} DH</ThemedText>
+            <ThemedText type="subtitle" style={{ color: themeColors.tint }}>{finalTotal.toFixed(2)} DH</ThemedText>
           </View>
         </View>
       </ScrollView>

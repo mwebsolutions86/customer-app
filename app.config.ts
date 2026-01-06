@@ -2,18 +2,27 @@ import { ExpoConfig, ConfigContext } from 'expo/config';
 import fs from 'fs';
 import path from 'path';
 
+// Interface pour typer la configuration de la marque
+interface BrandConfig {
+  name: string;
+  slug?: string;
+  scheme?: string;
+  storeId: string | null;
+  primaryColor: string;
+}
+
 // On lit la variable d'environnement
 const BRAND_SLUG = process.env.APP_VARIANT || 'default';
 
 // On construit le chemin du fichier config
 const brandConfigPath = path.join(__dirname, 'brands', BRAND_SLUG, 'config.json');
 
-// CORRECTION ICI : Utilisation de readFileSync au lieu de require()
-let brandConfig;
+// CORRECTION ICI : Utilisation de readFileSync avec typage approprié
+let brandConfig: BrandConfig;
 try {
   if (fs.existsSync(brandConfigPath)) {
     const rawData = fs.readFileSync(brandConfigPath, 'utf-8');
-    brandConfig = JSON.parse(rawData);
+    brandConfig = JSON.parse(rawData) as BrandConfig;
   } else {
     brandConfig = { name: "Momo Délice", storeId: null, primaryColor: "#000000" };
   }
