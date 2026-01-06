@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Image, StyleSheet } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Image, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,7 +39,7 @@ export default function ProductDetailsModal({ product, visible, onClose, onAddTo
   // --- LOGIQUE PRIX ---
   const getUnitPrice = () => {
     if (!product) return 0;
-    let base = selectedVariation ? selectedVariation.price : product.price;
+    const base = selectedVariation ? selectedVariation.price : product.price;
     const optionsTotal = Object.values(selectedOptions).flat().reduce((acc, opt) => acc + opt.price, 0);
     return base + optionsTotal;
   };
@@ -84,7 +84,7 @@ export default function ProductDetailsModal({ product, visible, onClose, onAddTo
     for (const group of product.option_groups || []) {
       const count = (selectedOptions[group.id] || []).length;
       if (count < group.min) {
-        alert(`Veuillez choisir au moins ${group.min} option(s) pour "${group.name}"`);
+        Alert.alert('Sélection requise', `Veuillez choisir au moins ${group.min} option(s) pour "${group.name}"`);
         return;
       }
     }

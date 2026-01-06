@@ -39,7 +39,9 @@ export const ThemeProvider = ({ children }) => {
           setTheme(prev => ({ ...prev, loading: false }));
         }
       } catch (e) {
-        console.error('Erreur chargement thème:', e);
+        // use logger
+        const { warn } = require('../lib/logger')
+        warn('Erreur chargement thème:', e)
         setTheme(prev => ({ ...prev, loading: false }));
       }
     };

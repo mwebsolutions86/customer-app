@@ -6,7 +6,9 @@
 export const CURRENT_STORE_ID = '73b158dd-4ff1-4294-9279-0f5d98f95480'; 
 
 // Couleur par défaut
+import { log } from './logger'
+
 export const THEME_COLOR = '#eab308'; 
 // ------------------------
 
-console.log("🔒 ID FORCÉ :", CURRENT_STORE_ID);
+log('🔒 ID FORCÉ :', CURRENT_STORE_ID)

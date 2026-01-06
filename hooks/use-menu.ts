@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { warn } from '@/lib/logger';
 
 // --- TYPES ---
 export interface OptionItem {
@@ -121,7 +122,7 @@ export const useMenu = (storeId: string) => {
           }
       }
     } catch (error) {
-      console.error('Erreur chargement menu:', error);
+      warn('Erreur chargement menu:', error)
     } finally {
       setLoading(false);
     }

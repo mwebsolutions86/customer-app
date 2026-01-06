@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useCart } from '@/hooks/use-cart';
 import { supabase } from '@/lib/supabase';
+import { error as logError } from '@/lib/logger';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as Location from 'expo-location';
@@ -29,14 +30,14 @@ export default function CheckoutScreen() {
   
   useEffect(() => {
     (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission refusée', 'La géolocalisation est nécessaire.');
         return;
       }
       setIsCheckingZone(true);
       try {
-        let location = await Location.getCurrentPositionAsync({});
+        const location = await Location.getCurrentPositionAsync({});
         setUserLocation(location);
         setDeliveryFee(10); // Simulation frais (À remplacer par votre logique de zone)
       } catch (err) {
@@ -117,7 +118,7 @@ export default function CheckoutScreen() {
       ]);
 
     } catch (error: any) {
-      console.error(error);
+      logError(error)
       Alert.alert('Erreur', error.message);
     } finally {
       setLoading(false);

@@ -148,8 +148,8 @@ export default function CartScreen() {
             <View style={styles.typeSelector}>
                 {['dine_in', 'takeaway', 'delivery'].map((type) => {
                     const isActive = orderType === type;
-                    let label = type === 'takeaway' ? "Emporter" : type === 'delivery' ? "Livraison" : "Sur Place";
-                    let icon = type === 'takeaway' ? "bag-handle" : type === 'delivery' ? "bicycle" : "restaurant";
+                    const label = type === 'takeaway' ? "Emporter" : type === 'delivery' ? "Livraison" : "Sur Place";
+                    const icon = type === 'takeaway' ? "bag-handle" : type === 'delivery' ? "bicycle" : "restaurant";
                     return (
                         <TouchableOpacity key={type} onPress={() => setOrderType(type as any)} style={[styles.typeBtn, isActive && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}>
                             <Ionicons name={icon as any} size={20} color={isActive ? SECONDARY : 'black'} />

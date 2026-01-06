@@ -47,7 +47,7 @@ export const useCart = create<CartState>()(
           const cartId = `${payload.id}-${variationId}-${optionsStr}-${ingredientsStr}`;
 
           const existingItemIndex = state.items.findIndex((item) => item.cartId === cartId);
-          let updatedItems = [...state.items];
+          const updatedItems = [...state.items];
 
           if (existingItemIndex > -1) {
             // Produit identique trouvé : on incrémente la quantité

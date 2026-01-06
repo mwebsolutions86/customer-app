@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { useStore, Store } from '../context/StoreProvider';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { warn } from '@/lib/logger';
 
 export default function SelectStoreScreen() {
   const { setStore } = useStore();
@@ -42,7 +43,7 @@ export default function SelectStoreScreen() {
         }
       }
     } catch (error) {
-      console.error('Erreur chargement:', error);
+      warn('Erreur chargement:', error)
       setBrandName("Restaurant");
     } finally {
       setLoading(false);

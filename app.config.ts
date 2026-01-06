@@ -1,6 +1,7 @@
 import { ExpoConfig, ConfigContext } from 'expo/config';
 import fs from 'fs';
 import path from 'path';
+import { warn } from '@/lib/logger';
 
 // Interface pour typer la configuration de la marque
 interface BrandConfig {
@@ -27,7 +28,7 @@ try {
     brandConfig = { name: "Momo Délice", storeId: null, primaryColor: "#000000" };
   }
 } catch (e) {
-  console.warn("Erreur lecture config:", e);
+  warn("Erreur lecture config:", e as unknown)
   brandConfig = { name: "Momo Délice", storeId: '73b158dd-4ff1-4294-9279-0f5d98f95480', primaryColor: "#50e6f8" };
 }
 
