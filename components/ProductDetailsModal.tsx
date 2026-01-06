@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Image, StyleSheet, Alert } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Image, StyleSheet, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -115,7 +115,7 @@ export default function ProductDetailsModal({ product, visible, onClose, onAddTo
           {/* HEADER IMAGE */}
           <View style={styles.imageContainer}>
              {product.image_url ? (
-               <Image source={{ uri: product.image_url }} style={styles.image} />
+               <Image source={{ uri: product.image_url }} style={styles.image} resizeMode="cover" />
              ) : (
                <View style={[styles.image, { backgroundColor: '#eee', justifyContent:'center', alignItems:'center' }]}>
                  <Ionicons name="fast-food" size={50} color="#ccc" />
@@ -229,8 +229,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'flex-end' },
   content: { backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '90%', overflow: 'hidden' },
   imageContainer: { height: 200, width: '100%', position: 'relative' },
-  image: { width: '100%', height: '100%', resizeMode: 'cover' },
-  closeButton: { position: 'absolute', top: 16, right: 16, backgroundColor: 'white', padding: 8, borderRadius: 20, shadowColor:'#000', shadowOpacity:0.1 },
+  image: { width: '100%', height: '100%' },
+  closeButton: { position: 'absolute', top: 16, right: 16, backgroundColor: 'white', padding: 8, borderRadius: 20, ...(Platform.OS !== 'web' ? { shadowColor:'#000', shadowOpacity:0.1 } : {}), boxShadow: Platform.OS === 'web' ? '0 6px 16px rgba(0,0,0,0.08)' : undefined },
   scrollContent: { padding: 20 },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 4 },
   description: { fontSize: 14, color: '#666', lineHeight: 20, marginBottom: 20 },

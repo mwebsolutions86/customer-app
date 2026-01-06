@@ -5,7 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useCart } from '@/hooks/use-cart';
 import { supabase } from '@/lib/supabase';
-import { error as logError } from '@/lib/logger';
+import { error as logError } from '../lib/logger';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as Location from 'expo-location';

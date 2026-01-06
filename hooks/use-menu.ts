@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { warn } from '@/lib/logger';
+import { warn } from '../lib/logger';
 
 // --- TYPES ---
 export interface OptionItem {

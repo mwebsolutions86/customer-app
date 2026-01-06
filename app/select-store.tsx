@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useStore, Store } from '../context/StoreProvider';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { warn } from '@/lib/logger';
+import { warn } from '../lib/logger';
 
 export default function SelectStoreScreen() {
   const { setStore } = useStore();
@@ -146,10 +146,8 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    ...(Platform.OS !== 'web' ? { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 } : {}),
+    boxShadow: Platform.OS === 'web' ? '0 4px 10px rgba(0,0,0,0.06)' : undefined,
     elevation: 2,
     borderWidth: 1,
     borderColor: '#f0f0f0',

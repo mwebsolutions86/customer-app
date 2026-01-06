@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
     formSection: { marginTop: 20, backgroundColor: 'white', padding: 20, borderRadius: 24 },
     inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 16, paddingHorizontal: 16, marginBottom: 12 },
     input: { flex: 1, paddingVertical: 16, fontSize: 16 },
-    footer: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'white', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 30, shadowColor: "#000", shadowOffset: { width: 0, height: -5 }, shadowOpacity: 0.05, shadowRadius: 20, elevation: 10 },
+    footer: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'white', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 30, ...(Platform.OS !== 'web' ? { shadowColor: "#000", shadowOffset: { width: 0, height: -5 }, shadowOpacity: 0.05, shadowRadius: 20, elevation: 10 } : {}), boxShadow: Platform.OS === 'web' ? '0 -10px 30px rgba(0,0,0,0.04)' : undefined },
     checkoutButton: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 18, borderRadius: 20 },
     checkoutText: { fontSize: 18, fontWeight: 'bold' }
 });

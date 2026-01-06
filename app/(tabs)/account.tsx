@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
@@ -109,7 +109,7 @@ export default function AccountScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F2F2F7' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { paddingBottom: 30, borderBottomLeftRadius: 30, borderBottomRightRadius: 30, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
+    header: { paddingBottom: 30, borderBottomLeftRadius: 30, borderBottomRightRadius: 30, ...(Platform.OS !== 'web' ? { shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 } : {}), boxShadow: Platform.OS === 'web' ? '0 8px 22px rgba(0,0,0,0.08)' : undefined },
   headerContent: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, gap: 15 },
   avatarContainer: { width: 70, height: 70, borderRadius: 35, backgroundColor: 'white', justifyContent: 'center', alignItems: 'center', borderWidth: 2 },
   avatarText: { fontSize: 28, fontWeight: 'bold' },

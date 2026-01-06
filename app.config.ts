@@ -1,7 +1,8 @@
 import { ExpoConfig, ConfigContext } from 'expo/config';
 import fs from 'fs';
 import path from 'path';
-import { warn } from '@/lib/logger';
+// Avoid importing project TypeScript helpers here because Expo reads this
+// config with Node and importing .ts files can fail at startup.
 
 // Interface pour typer la configuration de la marque
 interface BrandConfig {
@@ -28,7 +29,8 @@ try {
     brandConfig = { name: "Momo Délice", storeId: null, primaryColor: "#000000" };
   }
 } catch (e) {
-  warn("Erreur lecture config:", e as unknown)
+  // eslint-disable-next-line no-console
+  console.warn("Erreur lecture config:", e);
   brandConfig = { name: "Momo Délice", storeId: '73b158dd-4ff1-4294-9279-0f5d98f95480', primaryColor: "#50e6f8" };
 }
 
