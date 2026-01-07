@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Image, StyleSheet, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { platformShadow } from '@/lib/style-utils';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Product, Variation, OptionGroup, OptionItem, Ingredient } from '@/hooks/use-menu';
@@ -230,7 +231,7 @@ const styles = StyleSheet.create({
   content: { backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '90%', overflow: 'hidden' },
   imageContainer: { height: 200, width: '100%', position: 'relative' },
   image: { width: '100%', height: '100%' },
-  closeButton: { position: 'absolute', top: 16, right: 16, backgroundColor: 'white', padding: 8, borderRadius: 20, ...(Platform.OS !== 'web' ? { shadowColor:'#000', shadowOpacity:0.1 } : {}), boxShadow: Platform.OS === 'web' ? '0 6px 16px rgba(0,0,0,0.08)' : undefined },
+  closeButton: { position: 'absolute', top: 16, right: 16, backgroundColor: 'white', padding: 8, borderRadius: 20, ...platformShadow('0 6px 16px rgba(0,0,0,0.08)', { shadowColor: '#000', shadowOpacity: 0.1 }), },
   scrollContent: { padding: 20 },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 4 },
   description: { fontSize: 14, color: '#666', lineHeight: 20, marginBottom: 20 },

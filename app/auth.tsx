@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Dimensions, StatusBar, ActivityIndicator, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { platformShadow } from '@/lib/style-utils';
 import { supabase } from '../lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -112,13 +113,13 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F2F2F7' },
   blob: { position: 'absolute', width: width * 0.8, height: width * 0.8, borderRadius: width, transform: [{ scale: 1.5 }] },
-    iconContainer: { width: 80, height: 80, backgroundColor: 'white', borderRadius: 24, justifyContent: 'center', alignItems: 'center', ...(Platform.OS !== 'web' ? { shadowColor: '#000', shadowOpacity: 0.1, elevation: 5 } : {}), marginBottom: 16, boxShadow: Platform.OS === 'web' ? '0 6px 16px rgba(0,0,0,0.08)' : undefined },
+    iconContainer: { width: 80, height: 80, backgroundColor: 'white', borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginBottom: 16, ...platformShadow('0 6px 16px rgba(0,0,0,0.08)', { shadowColor: '#000', shadowOpacity: 0.1, elevation: 5 }), },
   title: { fontSize: 28, fontWeight: '900', color: '#111' },
   subtitle: { fontSize: 16, color: '#666', marginTop: 5 },
-    glassForm: { backgroundColor: 'rgba(255,255,255,0.7)', padding: 24, borderRadius: 32, borderWidth: 1, borderColor: 'white', ...(Platform.OS !== 'web' ? { shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 20 } : {}), boxShadow: Platform.OS === 'web' ? '0 10px 30px rgba(0,0,0,0.04)' : undefined },
+    glassForm: { backgroundColor: 'rgba(255,255,255,0.7)', padding: 24, borderRadius: 32, borderWidth: 1, borderColor: 'white', ...platformShadow('0 10px 30px rgba(0,0,0,0.04)', { shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 20 }), },
   toggleContainer: { flexDirection: 'row', backgroundColor: '#E5E7EB', borderRadius: 16, padding: 4, marginBottom: 24 },
   toggleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 12 },
-    toggleBtnActive: { backgroundColor: 'white', ...(Platform.OS !== 'web' ? { shadowColor: '#000', shadowOpacity: 0.1, elevation: 2 } : {}), boxShadow: Platform.OS === 'web' ? '0 4px 10px rgba(0,0,0,0.06)' : undefined },
+    toggleBtnActive: { backgroundColor: 'white', ...platformShadow('0 4px 10px rgba(0,0,0,0.06)', { shadowColor: '#000', shadowOpacity: 0.1, elevation: 2 }), },
   toggleText: { fontWeight: '600', color: '#666' },
   toggleTextActive: { color: 'black', fontWeight: 'bold' },
   inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', padding: 16, borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6' },

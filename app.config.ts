@@ -14,7 +14,19 @@ interface BrandConfig {
 }
 
 // On lit la variable d'environnement
-const BRAND_SLUG = process.env.APP_VARIANT || 'default';
+let BRAND_SLUG = process.env.APP_VARIANT || 'default';
+
+// If the specified brand folder doesn't exist, pick the first available brand folder
+const brandsDir = path.join(__dirname, 'brands');
+if (!fs.existsSync(path.join(brandsDir, BRAND_SLUG))) {
+  try {
+    const entries = fs.readdirSync(brandsDir, { withFileTypes: true });
+    const firstFolder = entries.find(e => e.isDirectory())?.name;
+    if (firstFolder) BRAND_SLUG = firstFolder;
+  } catch (e) {
+    // ignore, we'll fallback to defaults below
+  }
+}
 
 // On construit le chemin du fichier config
 const brandConfigPath = path.join(__dirname, 'brands', BRAND_SLUG, 'config.json');

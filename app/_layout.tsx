@@ -23,19 +23,13 @@ function AppContent({ session }: { session: Session | null }) {
 
   // LOGIQUE PRINCIPALE DE NAVIGATION
 
-  // Cas A : Pas connecté -> Auth
-  if (!session) {
-    return <AuthScreen />;
-  }
+  // Always render a single Stack navigator and control the initial route
+  const initialRoute = !session ? 'auth' : !currentStore ? 'select-store' : '(tabs)';
 
-  // Cas B : Connecté MAIS pas de magasin choisi -> Choix du magasin
-  if (!currentStore) {
-    return <SelectStoreScreen />;
-  }
-
-  // Cas C : Connecté ET magasin choisi -> Application (Tabs)
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="auth" />
+      <Stack.Screen name="select-store" />
       <Stack.Screen name="(tabs)" />
     </Stack>
   );

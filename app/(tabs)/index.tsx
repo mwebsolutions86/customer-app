@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, ActivityIndicator, StatusBar, StyleSheet, Dimensions, Platform } from 'react-native';
+import { platformShadow } from '@/lib/style-utils';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useMenu } from '../../hooks/use-menu';
@@ -137,21 +138,21 @@ const styles = StyleSheet.create({
     mainContainer: { flex: 1, backgroundColor: '#F2F2F7' },
     blob: { position: 'absolute', width: width * 0.8, height: width * 0.8, borderRadius: width, transform: [{ scale: 1.5 }] },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    headerGlass: { backgroundColor: 'rgba(255,255,255,0.95)', borderBottomLeftRadius: 32, borderBottomRightRadius: 32, paddingTop: 10, ...(Platform.OS !== 'web' ? { shadowColor: "#000", shadowOpacity: 0.05, elevation: 5 } : {}), boxShadow: Platform.OS === 'web' ? '0 5px 12px rgba(0,0,0,0.06)' : undefined },
+    headerGlass: { backgroundColor: 'rgba(255,255,255,0.95)', borderBottomLeftRadius: 32, borderBottomRightRadius: 32, paddingTop: 10, ...platformShadow('0 5px 12px rgba(0,0,0,0.06)', { shadowColor: '#000', shadowOpacity: 0.05, elevation: 5 }), },
     headerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 15 },
     welcomeText: { fontSize: 14, color: '#666', fontWeight: '600', marginBottom: 2 },
-    logoWrapper: { shadowColor: "#000", shadowOpacity: 0.1, elevation: 5, boxShadow: Platform.OS === 'web' ? '0 4px 8px rgba(0,0,0,0.08)' : undefined },
+    logoWrapper: { ...platformShadow('0 4px 8px rgba(0,0,0,0.08)', { shadowColor: '#000', shadowOpacity: 0.1, elevation: 5 }), },
     logo: { width: 48, height: 48, borderRadius: 14, borderWidth: 1.5 },
     storeName: { fontSize: 22, fontWeight: '900' },
     storeDesc: { fontSize: 12, color: '#666', fontWeight: '500' },
     statusDot: { width: 8, height: 8, borderRadius: 4 },
-    cartButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'white', justifyContent: 'center', alignItems: 'center', shadowOpacity: 0.1, borderWidth: 1, borderColor: '#f0f0f0', boxShadow: Platform.OS === 'web' ? '0 4px 8px rgba(0,0,0,0.06)' : undefined },
+    cartButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'white', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#f0f0f0', ...platformShadow('0 4px 8px rgba(0,0,0,0.06)', { shadowOpacity: 0.1 }), },
     badge: { position: 'absolute', top: -2, right: -2, borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 2 },
     badgeText: { fontSize: 10, fontWeight: 'bold' },
     categoryPill: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 30, borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)', backgroundColor: 'rgba(255,255,255,0.8)' },
     categoryText: { fontWeight: '700', fontSize: 13, color: '#666' },
     sectionTitle: { fontSize: 24, fontWeight: '900', marginBottom: 16 }, 
-    card: { backgroundColor: 'white', borderRadius: 24, padding: 12, marginBottom: 16, flexDirection: 'row', gap: 16, shadowOpacity: 0.05, shadowOffset: {width:0, height:5}, boxShadow: Platform.OS === 'web' ? '0 6px 14px rgba(0,0,0,0.04)' : undefined },
+    card: { backgroundColor: 'white', borderRadius: 24, padding: 12, marginBottom: 16, flexDirection: 'row', gap: 16, ...platformShadow('0 6px 14px rgba(0,0,0,0.04)', { shadowOpacity: 0.05, shadowOffset: { width: 0, height: 5 } }), },
     cardImage: { width: 80, height: 80, borderRadius: 16, backgroundColor: '#eee' },
     productName: { fontWeight: '800', fontSize: 16 }, 
     productDesc: { color: '#666', fontSize: 12, marginVertical: 4 },
@@ -161,7 +162,7 @@ const styles = StyleSheet.create({
     modalContent: { borderTopLeftRadius: 32, borderTopRightRadius: 32, height: '95%', overflow: 'hidden' }, 
     modalImageContainer: { height: 250, width: '100%', position: 'relative' },
     modalImage: { width: '100%', height: '100%' },
-    closeButton: { position: 'absolute', top: 20, right: 20, width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', shadowOpacity: 0.2, boxShadow: Platform.OS === 'web' ? '0 6px 16px rgba(0,0,0,0.08)' : undefined },
+    closeButton: { position: 'absolute', top: 20, right: 20, width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', ...platformShadow('0 6px 16px rgba(0,0,0,0.08)', { shadowOpacity: 0.2 }), },
     modalTitle: { fontSize: 28, fontWeight: '900', marginBottom: 5 },
     modalPrice: { fontSize: 22, fontWeight: '700', marginBottom: 15 },
     modalDesc: { fontSize: 16, lineHeight: 24 },
@@ -173,7 +174,7 @@ const styles = StyleSheet.create({
     optionName: { fontSize: 15, fontWeight: '500' },
     optionPrice: { fontSize: 13, marginTop: 2 },
     checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
-    modalFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 24, paddingBottom: 40, borderTopWidth: 1, flexDirection: 'row', gap: 15, alignItems: 'center', shadowColor: "#000", shadowOffset: {width:0, height:-5}, shadowOpacity: 0.05, elevation: 10, boxShadow: Platform.OS === 'web' ? '0 -6px 16px rgba(0,0,0,0.04)' : undefined },
+    modalFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 24, paddingBottom: 40, borderTopWidth: 1, flexDirection: 'row', gap: 15, alignItems: 'center', ...platformShadow('0 -6px 16px rgba(0,0,0,0.04)', { shadowColor: '#000', shadowOffset: { width: 0, height: -5 }, shadowOpacity: 0.05, elevation: 10 }), },
     qtyControl: { flexDirection: 'row', alignItems: 'center', gap: 15, padding: 12, borderRadius: 16 },
     qtyBtn: { padding: 5 },
     confirmButton: { flex: 1, padding: 18, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
